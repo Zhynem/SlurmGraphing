@@ -1,0 +1,176 @@
+#!/bin/bash
+
+# Script to generate the sgraphing.conf and the config.py files
+
+function print_help()
+{
+cat >&2 << EOF
+
+  Configure arguments:
+
+    Core arguments:
+
+		-sb=/path/to/bin || --slurm-bin=/path/to/bin : Path to SLURM binary files.
+		
+		-rl=/path/to/rrds || --rrd-loc=/path/to/rrds : Path to create RRD files.
+		
+		-pg || --partition-graphing : Enable graphing for configured partitions.
+		
+		-gg || --group-graphing : Enable graphing for configured groups of nodes.
+		
+		-ng || --node-graphing : Enable graphing for individual nodes.
+		
+		-cj || --corejob-graphing : Enable graphing for cores requested per job.
+		
+		-t || --totaling : Enable summation of jobs and/or node cores.
+		
+		-td=1051200 || --time-duration=1051200 : Rows* in an RRD file.
+		
+		-ts=60 || --time-step=60 : Time between RRD updates (in seconds).
+		
+		--log-loc=/path/to/logs	: Path to create log files (if configured).
+		
+		--log-level=2 : Set the amount of logging to do (0,1, or 2).
+		
+		*Given these example inputs the RRD files will store 1051200 minutes (2 years) of data
+			because the time step is 60 seconds. An example of less frequent polling would be:
+			-td=525600 and -ts=120 (Update every 2 minutes for 2 years)
+
+	Display arguments:
+	
+		-ml || --main-links : Turn group images on the main page into links to the group breakdown.
+		
+		-nc=4 || --node-columns=4 : Number of columns in the table that displays individual nodes.
+		
+		--no-slider : Disable the slider control (On by default)
+		
+		--manual : Enable manual time inputs (Off by default)
+		
+		-gs=/path/to/script.sh || --graph-script=/path/to/script.sh : Path to the make_graph.sh script.
+	
+	
+	**The path to SLURM Binaries must be set, all other variables will have default values set.
+
+EOF
+}
+
+# Flag catching
+for i in "$@"
+do
+case $i in
+    -sb=*|--slurm-bin=*)
+		sbin_loc="${i#*=}"
+	    shift
+    ;;
+	-rl=*|--rrd-loc=*)
+		rrd_loc=$"${i#*=}"
+		shift
+	;;
+	-pg|--partition-graphing)
+		part_graph="true"
+		shift
+	;;
+	-gg|--group-graphing)
+		group_graph="true"
+		shift
+	;;
+	-ng|--node-graphing)
+		node_graph="true"
+		shift
+	;;
+	-cj|--corejob-graphing)
+		corejob_graph="true"
+		shift
+	;;
+	-t|--totaling)
+		totaling="true"
+		shift
+	;;
+	--log-loc=*)
+		log_loc="${i#*=}"
+		shift
+	;;
+	--log-level=*)
+		temp="${i#*=}"
+		if [[ "$temp" -lt "0" || "$temp" -gt "2" ]]; then
+			echo "Error: Invalid logging level. Exiting." >&2
+			exit 1
+		else
+			log_level=$temp
+		fi
+		shift		
+	;;
+	-td=*|--time-duration=*)
+		time_duration="${i#*=}"
+		shift
+	;;
+	-ts=*|--time-step=*)
+		time_step="${i#*=}"
+		shift
+	;;
+	#Display config
+	-ml|--main-links)
+		main_links="true"
+		shift
+	;;
+	-nc=*|--node-columns=*)
+		node_columns="${i#*=}"
+		shift
+	;;
+	--no-slider)
+		slider="false"
+		shift
+	;;
+	--manual)
+		manual="true"
+		shift
+	;;
+	-gs=*|--graph-script=*)
+		graph_script="${i#*=}"
+		shift
+	;;
+	-h|--help)
+		print_help
+		exit 0
+	;;
+    *)
+    	print_help
+		echo "Error: Invalid config flag. Exiting" >&2
+		exit 1
+    ;;
+esac
+done
+
+#Check variables, set un-important variables to default values, query for important ones
+if [[ -z "$sbin_loc" ]]; then
+	printf "Please enter the location of the SLURM binaries: "
+	read temp
+	while [[ ! -a "$temp/scontrol" ]]; do
+		printf "\nThe file 'scontrol' was not found in the directory specified.\nUse the format '/path/to/bin'\nPlease enter a new location: "
+		read temp
+	done
+else
+	#Check for valid location (scontrol must be present)
+	if [[ ! -a "$sbin_loc/scontrol" ]]; then
+		echo "Error: Could not find scontrol. Exiting." >&2
+		exit 1
+	fi
+fi
+
+#sbin_loc="${i#*=}"
+#rrd_loc=$"${i#*=}"
+#part_graph="true"
+#group_graph="true"
+#node_graph="true"
+#corejob_graph="true"
+#totaling="true"
+#log_loc="${i#*=}"
+#log_level=$temp
+#time_duration="${i#*=}"
+#time_step="${i#*=}"
+##Display config
+#main_links="true"
+#node_columns="${i#*=}"
+#slider="false"
+#manual="true"
+#graph_script="${i#*=}"

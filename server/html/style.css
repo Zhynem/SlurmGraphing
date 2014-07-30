@@ -1,0 +1,133 @@
+parts
+{
+  width: 1024px;
+  margin: auto;
+}
+
+#title
+{
+  text-align: center;
+}
+
+.content
+{
+  width: 850px;
+  margin: auto;
+}
+
+#inputs
+{
+  width: 850px;
+}
+
+#radios
+{
+  width: 150px;
+  float: left;
+  margin-bottom: 25px;
+}
+
+h4
+{
+  margin: 8px 0;
+}
+
+#selectBreak
+{
+  margin: 8px;
+}
+
+#rangeInput
+{
+  width: 600px;
+  height: 75px;
+  margin: auto 0px auto 18%;
+}
+
+#rangeSelect
+{
+  width: 500px;
+  margin: auto;
+}
+
+li
+{
+  display: inline;
+  margin: 0 45px 0 0;
+}
+
+#hour
+{
+  margin: 0 0 0 0;
+}
+
+#day
+{
+  margin: 0 0 0 50px;
+}
+
+#week
+{
+  margin: 0 0 0 58px;
+}
+
+#month
+{
+  margin: 0 0 0 47px;
+}
+
+#year
+{
+  margin: 0 0 0 50px;
+}
+
+#twoyear
+{
+  margin: 0 0 0 48px;
+}
+
+#rangeLabel
+{
+  list-style-image: none;
+  width: 600px;
+  padding: 0;
+  margin: 0 0 15px auto;
+}
+
+#selectors
+{
+  width: 125px;
+  margin-top: 0px;
+  margin-bottom: 0px;
+  float: right;
+}
+
+.graph
+{
+  margin: auto;
+  margin-left: 24px;
+}
+
+#nodes
+{
+	margin: auto;
+	clear: left;
+}
+
+.node
+{
+	float: none;
+	margin: 1px;
+}
+
+table
+{
+	margin: auto;
+}
+
+#formGraphs
+{
+	width: 500px;
+	margin: auto;
+}
+
