@@ -4,7 +4,7 @@
 source ./sgraphing.conf
 
 #-------------------------------------
-#------ Concurrent List Parsing ------
+#------ Segmented List Parsing ------
 #-------------------------------------
 function parseList(){
 	#Get a function to call and list of things to call it on
@@ -51,7 +51,7 @@ configuredNode() {
 }
 function parseNode() {
 	#Find out what segment we are, the length to look at, and if there's
-	#  a remainder we have
+	#  a remainder
 	segment=$1
 	seg_length=$2
 	remainder=$3
@@ -88,8 +88,8 @@ function get_node_info() {
 	#output=$($slurm_bin/scontrol show node -o | sed 's/ /,/g')
 	
 	# At home, need to read file instead of calling scontrol
-	output=(`cat ./large_node_info.txt`)
-	#output=(`cat ./nodeInfo.txt`)
+	#output=(`cat ./large_node_info.txt`)
+	output=(`cat ./nodeInfo.txt`)
 	
 	#len=$((${#output[@]}-1))
 	#Try to concurrently parse the list for best speed
@@ -113,8 +113,9 @@ function get_node_info() {
 function get_job_info() {
 	#output=(`$slurm_bin/squeue -h -o '%P,%t,%C'`)
 	#output=(`cat ./large_job_info.txt`)
-	output=(`cat ./medium_job_info.txt`)
-	#output=(`cat ./jobInfo.txt`)
+	#output=(`cat ./medium_job_info.txt`)
+	output=(`cat ./jobInfo.txt`)
+	#output=(`cat ./small_job_info.txt`)
 	echo ${output[@]}
 }
 
@@ -208,7 +209,7 @@ function node_total() {
 	esac
 	
 	#Update and Report
-	echo "`date +%s`-$totBusy-$totIdle-$totDown" >> $verbose_logging
+	echo "`date +%s`-$totBusy-$totIdle-$totDown" #>> $verbose_logging
 #	rrdtool update $rrd_loc/all_group.rrd -t busy:idle:offline `date +%s`:$totAlloc:$totIdle:$totDown >> $minimal_logging &
 }
 function groupNodeSeg() {
@@ -381,7 +382,7 @@ function node_group() {
 		T_down=$group$temp
 		
 		#Update and Report
-		echo "`date +%s`-${dictionary[$T_busy]}-${dictionary[$T_idle]}-${dictionary[$T_down]}" >> $verbose_logging
+		echo "`date +%s`-${dictionary[$T_busy]}-${dictionary[$T_idle]}-${dictionary[$T_down]}" #>> $verbose_logging
 		#rrdtool update $rrd_loc/"$group"_group.rrd -t busy:idle:offline `date +%s`:${dictionary[$T_busy]}:${dictionary[$T_idle]}:${dictionary[$T_down]} >> $minimal_logging &
 	done
 }
@@ -422,7 +423,7 @@ function node_indiv() {
 		;;
 		esac
 		
-		echo "`date +%s`-$nodeAlloc-$nodeIdle-$nodeDown" >> $verbose_logging
+		echo "`date +%s`-$nodeAlloc-$nodeIdle-$nodeDown" #>> $verbose_logging
 		#rrdtool update $rrd_loc/"$nodeName"_node.rrd -t busy:idle:offline `date +%s`:$nodeAlloc:$nodeIdle:$nodeDown >> $minimal_logging &
 	done
 }
@@ -534,12 +535,12 @@ function part_total() {
 	esac
 
 	if [[ "$corejob_graphing" == "true" ]]; then
-		  echo "`date +%s`-$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" >> $verbose_logging
+		  echo "`date +%s`-$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" #>> $verbose_logging
 #		  rrdtool update $rrd_loc/all_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $minimal_logging &
 #		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
 
 	else
-		  echo "`date +%s`-$totQueued-$totRunning" >> $verbose_logging
+		  echo "`date +%s`-$totQueued-$totRunning" #>> $verbose_logging
 #		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
 	fi
 }
@@ -570,7 +571,7 @@ function indivPartSeg() {
 	r257_512=0
 	rGT512=0
 	
-	#Set up a dictionary for each partition
+	#Set up a section in the dictionary for each partition
 	declare -A dictionary
 	for part in "${partitionlist[@]}"; do
 		dictionary["$part-q"]=0
@@ -594,7 +595,16 @@ function indivPartSeg() {
 	
 	for index in $(seq $start $end); do
 		partition=$(echo "${array[$index]}" | cut -f1 -d ',')
-		if [[ $inPart == "false" ]]; then break; fi
+		
+		inPart="false"
+		for item in ${partitionlist[@]}; do
+			if [[ "$partition" == "$item" ]]; then 
+				inPart="true"
+				break
+			fi
+		done
+		
+		if [[ "$inPart" == "false" ]]; then break; fi
 		
 		jobState=$(echo "${array[$index]}" | cut -f2 -d ',')
 		case "$jobState" in
@@ -604,199 +614,118 @@ function indivPartSeg() {
 
 		if [[ "$corejob_graphing" == "true" ]] && [[ $jobState == "R" ]]; then
 			jobCores=$(echo  "${array[$index]}" | cut -f3 -d ',')
-			if [[ $jobCores == 1 ]]; then r1=1; fi
-			if [[ $jobCores == 2 ]]; then r2=2; fi
-			if [[ $jobCores -ge 3 && $jobCores -le 4 ]]; then r3_4=$jobCores; fi
-			if [[ $jobCores -ge 5 && $jobCores -le 8 ]]; then r5_8=$jobCores; fi
-			if [[ $jobCores -ge 9 && $jobCores -le 16 ]]; then r9_16=$jobCores; fi
-			if [[ $jobCores -ge 17 && $jobCores -le 32 ]]; then r17_32=$jobCores; fi
-			if [[ $jobCores -ge 33 && $jobCores -le 64 ]]; then r33_64=$jobCores; fi
-			if [[ $jobCores -ge 65 && $jobCores -le 128 ]]; then r65_128=$jobCores; fi
-			if [[ $jobCores -ge 129 && $jobCores -le 256 ]]; then r129_256=$jobCores; fi
-			if [[ $jobCores -ge 257 && $jobCores -le 512 ]]; then r257_512=$jobCores; fi
-			if [[ $jobCores -gt 512 ]]; then rGT512=$jobCores; fi
-			
-			dictionary["$partition-1"]=$((dictionary["$partition-1"]+r1))
-			dictionary["$partition-2"]=$((dictionary["$partition-2"]+r2))
-			dictionary["$partition-3"]=$((dictionary["$partition-3"]+r3_4))
-			dictionary["$partition-4"]=$((dictionary["$partition-4"]+r5_8))
-			dictionary["$partition-5"]=$((dictionary["$partition-5"]+r9_16))
-			dictionary["$partition-6"]=$((dictionary["$partition-6"]+r17_32))
-			dictionary["$partition-7"]=$((dictionary["$partition-7"]+r33_64))
-			dictionary["$partition-8"]=$((dictionary["$partition-8"]+r65_128))
-			dictionary["$partition-9"]=$((dictionary["$partition-9"]+r129_256))
-			dictionary["$partition-10"]=$((dictionary["$partition-10"]+r257_512))
-			dictionary["$partition-11"]=$((dictionary["$partition-11"]+rGT512))		
+			if [[ $jobCores == 1 ]]; then dictionary["$partition-1"]=$((dictionary["$partition-1"]+1)); fi
+			if [[ $jobCores == 2 ]]; then dictionary["$partition-2"]=$((dictionary["$partition-2"]+2)); fi
+			if [[ $jobCores -ge 3 && $jobCores -le 4 ]]; then dictionary["$partition-3"]=$((dictionary["$partition-3"]+$jobCores)); fi
+			if [[ $jobCores -ge 5 && $jobCores -le 8 ]]; then dictionary["$partition-4"]=$((dictionary["$partition-4"]+$jobCores)); fi
+			if [[ $jobCores -ge 9 && $jobCores -le 16 ]]; then dictionary["$partition-5"]=$((dictionary["$partition-5"]+$jobCores)); fi
+			if [[ $jobCores -ge 17 && $jobCores -le 32 ]]; then dictionary["$partition-6"]=$((dictionary["$partition-6"]+$jobCores)); fi
+			if [[ $jobCores -ge 33 && $jobCores -le 64 ]]; then dictionary["$partition-7"]=$((dictionary["$partition-7"]+$jobCores)); fi
+			if [[ $jobCores -ge 65 && $jobCores -le 128 ]]; then dictionary["$partition-8"]=$((dictionary["$partition-8"]+$jobCores)); fi
+			if [[ $jobCores -ge 129 && $jobCores -le 256 ]]; then dictionary["$partition-9"]=$((dictionary["$partition-9"]+$jobCores)); fi
+			if [[ $jobCores -ge 257 && $jobCores -le 512 ]]; then dictionary["$partition-10"]=$((dictionary["$partition-10"]+$jobCores)); fi
+			if [[ $jobCores -gt 512 ]]; then dictionary["$partition-11"]=$((dictionary["$partition-11"]+$jobCores)); fi
 		fi
 	done
 
-	#echo "$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" > /tmp/totalPartSeg.$segment
 	for p in "${partitionlist[@]}"; do
-		echo "$p: ${dictionary[$p-q]}-${dictionary[$p-r]}"
+		if [[ "$corejob_graphing" == "true" ]]; then
+			echo "$p-${dictionary[$p-q]}-${dictionary[$p-r]}-${dictionary[$p-1]}-${dictionary[$p-2]}-${dictionary[$p-3]}-${dictionary[$p-4]}-${dictionary[$p-5]}-${dictionary[$p-6]}-${dictionary[$p-7]}-${dictionary[$p-8]}-${dictionary[$p-9]}-${dictionary[$p-10]}-${dictionary[$p-11]}" >> /tmp/indivPartSeg.$segment
+		else
+			echo "$p-${dictionary[$p-q]}-${dictionary[$p-r]}" >> /tmp/indivPartSeg.$segment
+		fi
 	done
-#	> /tmp/groupNodeSeg.$segment
-#
-#	#Set up a dictionary for each group to have 3 variables available
-#	declare -A dictionary
-#	for group in "${grouplist[@]}"; do
-#		temp="-b"
-#		T_busy=$group$temp
-#		temp="-i"
-#		T_idle=$group$temp
-#		temp="-d"
-#		T_down=$group$temp
-#		
-#		dictionary[$T_busy]=0
-#		dictionary[$T_idle]=0
-#		dictionary[$T_down]=0
-#	done
-#
-#	#For each item find busy, idle, down cores, add them up and send them
-#	#  to a temp file
-#	for index in `seq $start $end`; do
-#		item=($(echo ${list[$index]} | sed 's/,/ /g'))
-#		name=$(echo ${item[0]})
-#		alloc=$(echo ${item[1]})
-#		tot=$(echo ${item[2]})
-#		state=$(echo ${item[3]})
-#		
-#		busy=$alloc
-#		
-#		if [ "$state" == "ALLOCATED" ] || [ "$state" == "IDLE" ] || [ "$state" == "MIXED" ]; then
-#			temp=$((tot-alloc))
-#			idle=$temp
-#		else
-#			temp=$((tot-alloc))
-#			down=$temp
-#		fi
-#		
-#		#Find which group this node belongs to and add to busy-idle-down
-#		
-#		#Remove any numbers and special characters from the name to get
-#		#  a group
-#		grp=$(echo $name | sed 's/[0-9!@#$%^&*)(_+=-].*//g')
-#		
-#		#Check to see if it's a group that's configured
-#		contains() {
-#			t1=$1
-#			shift
-#			l=("$@")
-#			[[ ${l[@]} =~ $t1 ]] && echo "true" || echo "false"
-#		}
-#		
-#		inGroup=$(contains $grp ${grouplist[@]})
-#		
-#		#If it's configured add it to the proper place in the dictionary
-#		if [[ "$inGroup" == "true" ]]; then
-#			temp="-b"
-#			T_busy=$grp$temp
-#			temp="-i"
-#			T_idle=$grp$temp
-#			temp="-d"
-#			T_down=$grp$temp
-#			
-#			dictionary[$T_busy]=$((dictionary[$T_busy]+busy))
-#			dictionary[$T_idle]=$((dictionary[$T_idle]+idle))
-#			dictionary[$T_down]=$((dictionary[$T_down]+down))
-#		fi
-#		
-#	done
-#
-#	#Write the results of each group to a temp file
-#	for group in "${grouplist[@]}"; do
-#		temp="-b"
-#		T_busy=$group$temp
-#		temp="-i"
-#		T_idle=$group$temp
-#		temp="-d"
-#		T_down=$group$temp
-#		
-#		echo "$group-${dictionary[$T_busy]}-${dictionary[$T_idle]}-${dictionary[$T_down]}" >> /tmp/groupNodeSeg.$segment
-#	done
 }
 function part_indiv() {
 	array=("$@")
 	
-	parseList "indivPartSeg" "${array[@]}"
+	segs=$(parseList "indivPartSeg" "${array[@]}")
+	#parseList "indivPartSeg" "${array[@]}"
 	
 	wait
 	
-	#for x in $(seq 0 $((segs-1))); do
-	#	echo "Reconstructing"
-	#done
+	#Create dictionary for all the values needed
+	declare -A dictionary
+	for part in "${partitionlist[@]}"; do
+		dictionary["$part-q"]=0
+		dictionary["$part-r"]=0
+		if [[ $corejob_graphing == "true" ]]; then
+			dictionary["$part-1"]=0
+			dictionary["$part-2"]=0
+			dictionary["$part-3"]=0
+			dictionary["$part-4"]=0
+			dictionary["$part-5"]=0
+			dictionary["$part-6"]=0
+			dictionary["$part-7"]=0
+			dictionary["$part-8"]=0
+			dictionary["$part-9"]=0
+			dictionary["$part-10"]=0
+			dictionary["$part-11"]=0
+		fi
+	done
 	
-# OLD SHTOOF
-#	totQueued=0
-#	totRunning=0
-#	r1=0
-#	r2=0
-#	r3_4=0
-#	r5_8=0
-#	r9_16=0
-#	r17_32=0
-#	r33_64=0
-#	r65_128=0
-#	r129_256=0
-#	r257_512=0
-#	rGT512=0
-#	for item in "${array[@]}"; do
-#		jobPart=$(echo $item | cut -f1 -d ',')
-#		if [[ $jobPart == *$part* ]]; then
-#			jobState=$(echo $item | cut -f2 -d ',')
-#			case "$jobState" in
-#				"PD") totQueued=$(($totQueued + 1));;
-#				"R") totRunning=$(($totRunning + 1))
-#			esac
-#
-#			if [[ $1 == "true" ]] && [[ $jobState == "R" ]]; then
-#			jobCores=$(echo  $item | cut -f3 -d ',')
-#			if [[ $jobCores == 1 ]]; then r1=$(($r1 + 1)); fi
-#			if [[ $jobCores == 2 ]]; then r2=$(($r2 + 2)); fi
-#			if [[ $jobCores -ge 3 && $jobCores -le 4 ]]; then r3_4=$(($r3_4 + $jobCores)); fi
-#			if [[ $jobCores -ge 5 && $jobCores -le 8 ]]; then r5_8=$(($r5_8 + $jobCores)); fi
-#			if [[ $jobCores -ge 9 && $jobCores -le 16 ]]; then r9_16=$(($r9_16 + $jobCores)); fi
-#			if [[ $jobCores -ge 17 && $jobCores -le 32 ]]; then r17_32=$(($r17_32 + $jobCores)); fi
-#			if [[ $jobCores -ge 33 && $jobCores -le 64 ]]; then r33_64=$(($r33_64 + $jobCores)); fi
-#			if [[ $jobCores -ge 65 && $jobCores -le 128 ]]; then r65_128=$(($r65_128 + $jobCores)); fi
-#			if [[ $jobCores -ge 129 && $jobCores -le 256 ]]; then r129_256=$(($r129_256 + $jobCores)); fi
-#			if [[ $jobCores -ge 257 && $jobCores -le 512 ]]; then r257_512=$(($r257_512 + $jobCores)); fi
-#			if [[ $jobCores -gt 512 ]]; then rGT512=$(($rGT512 + $jobCores)); fi
-#		fi		
-#	fi
-#	done
+	for x in $(seq 0 $((segs-1))); do
+		temp=(`cat /tmp/indivPartSeg.$x`)
+		for line in "${temp[@]}"; do
+			part=$(echo $line | cut -f1 -d '-')
+			t_q=$(echo $line | cut -f2 -d '-')
+			t_r=$(echo $line | cut -f3 -d '-')
+			dictionary["$part-q"]=$((dictionary["$part-q"]+t_q))
+			dictionary["$part-r"]=$((dictionary["$part-r"]+t_r))
+			
+			if [[ "$corejob_graphing" == "true" ]]; then
+				t_1=$(echo $line | cut -f4 -d '-')
+				t_2=$(echo $line | cut -f5 -d '-')
+				t_3=$(echo $line | cut -f6 -d '-')
+				t_4=$(echo $line | cut -f7 -d '-')
+				t_5=$(echo $line | cut -f8 -d '-')
+				t_6=$(echo $line | cut -f9 -d '-')
+				t_7=$(echo $line | cut -f10 -d '-')
+				t_8=$(echo $line | cut -f11 -d '-')
+				t_9=$(echo $line | cut -f12 -d '-')
+				t_10=$(echo $line | cut -f13 -d '-')
+				t_11=$(echo $line | cut -f14 -d '-')
+				dictionary["$part-1"]=$((dictionary["$part-1"]+t_1))
+				dictionary["$part-2"]=$((dictionary["$part-2"]+t_2))
+				dictionary["$part-3"]=$((dictionary["$part-3"]+t_3))
+				dictionary["$part-4"]=$((dictionary["$part-4"]+t_4))
+				dictionary["$part-5"]=$((dictionary["$part-5"]+t_5))
+				dictionary["$part-6"]=$((dictionary["$part-6"]+t_6))
+				dictionary["$part-7"]=$((dictionary["$part-7"]+t_7))
+				dictionary["$part-8"]=$((dictionary["$part-8"]+t_8))
+				dictionary["$part-9"]=$((dictionary["$part-9"]+t_9))
+				dictionary["$part-10"]=$((dictionary["$part-10"]+t_10))
+				dictionary["$part-11"]=$((dictionary["$part-11"]+t_11))
+			fi
+			
+		done
+	done
 
-#Fix this for individual partitions
-#	case "$log_level" in
-#		0)
-#		  verbose_logging=/dev/null
-#		  minimal_logging=/dev/null
-#		;;
-#		1)
-#		  verbose_logging=/dev/null
-#		  minimal_logging=$log_loc/all_part.log
-#		;;
-#		2) 
-#		  verbose_logging=$log_loc/all_part.log 2>&1
-#		  minimal_logging=$log_loc/all_part.log 2>&1
-#		;;
-#	esac
-#
-#	if [[ "$corejob_graphing" == "true" ]]; then
-#		  echo "`date +%s`-$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" #>> $verbose_logging 2>&1
-#		  rrdtool update $rrd_loc/all_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $minimal_logging &
-#		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
-#
-#	else
-#		  echo "`date +%s`-$totQueued-$totRunning" #>> $verbose_logging
-#		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
-#	fi
+	for part in ${partitionlist[@]}; do
+		case "$log_level" in
+			0)
+			  verbose_logging=/dev/null
+			  minimal_logging=/dev/null
+			;;
+			1)
+			  verbose_logging=/dev/null
+			  minimal_logging=$log_loc/all_part.log
+			;;
+			2) 
+			  verbose_logging=$log_loc/"$part"_part.log 2>&1
+			  minimal_logging=$log_loc/"$part"_part.log 2>&1
+			;;
+		esac
 
-
-#		  echo "Partition $part: `date +%s`-$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" #>> $log_loc/"$part"_part.log 2>&1
-# 		  rrdtool update $rrd_loc/"$part"_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $log_loc/"$part"_part.log 2>&1 &
-#		  rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $log_loc/"$part"_part.log 2>&1 &
-#		  echo "`date +%s`-$totQueued-$totRunning" #>> $loc_loc/"$part"_part.log 2>&1
-#		  rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $loc_loc/"$part"_part.log 2>&1 &
+		if [[ "$corejob_graphing" == "true" ]]; then
+			  echo `date +%s`-${dictionary["$part-q"]}-${dictionary["$part-r"]}-${dictionary["$part-1"]}-${dictionary["$part-2"]}-${dictionary["$part-3"]}-${dictionary["$part-4"]}-${dictionary["$part-5"]}-${dictionary["$part-6"]}-${dictionary["$part-7"]}-${dictionary["$part-8"]}-${dictionary["$part-9"]}-${dictionary["$part-10"]}-${dictionary["$part-11"]} #>> $verbose_logging
+			  #rrdtool update $rrd_loc/"$part"_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $minimal_logging &
+			  #rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
+		else
+			  echo `date +%s`-${dictionary[$part-q]}-${dictionary[$part-r]} #>> $verbose_logging
+			  #rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
+		fi
+	done
 }
 
 #--------------------------------------
@@ -820,7 +749,6 @@ fi
 if [[ $part_totaling == "true" ]]; then
 		part_total "${job_info[@]}" &
 fi
-
 
 #If grouping is enabled spawn a thread for each group to find info on that
 if [[ $group_graphing == "true" ]]; then
