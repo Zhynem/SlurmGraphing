@@ -270,7 +270,10 @@ function groupNodeSeg() {
 			shift
 			l=("$@")
 			for i in ${l[@]}; do
-				if 
+				if [[ "$i" == "$t1" ]]; then
+					echo "true"
+					return;
+				fi
 			done
 			#[[ ${l[@]} =~ $t1 ]] && echo "true" || echo "false"
 		}
@@ -279,9 +282,9 @@ function groupNodeSeg() {
 		
 		#If it's configured add it to the proper place in the dictionary
 		if [[ "$inGroup" == "true" ]]; then
-			dictionary["$grp-b"]=$((dictionary[$T_busy]+busy))
-			dictionary["$grp-i"]=$((dictionary[$T_idle]+idle))
-			dictionary["$grp-d"]=$((dictionary[$T_down]+down))
+			dictionary["$grp-b"]=$((dictionary["$grp-b"]+busy))
+			dictionary["$grp-i"]=$((dictionary["$grp-i"]+idle))
+			dictionary["$grp-d"]=$((dictionary["$grp-d"]+down))
 		fi
 	done
 
