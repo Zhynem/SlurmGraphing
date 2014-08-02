@@ -3,16 +3,16 @@
 #Read the .conf file
 source ./sgraphing.conf
 
-#-------------------------------------
-#------ Segmented List Parsing ------
-#-------------------------------------
+
+## Segmented List Parsing ##
+############################
 function parseList(){
-	#Get a function to call and list of things to call it on
+	#Get a function to call and list to parse
 	func=$1
 	shift
 	list=("$@")
 	
-	#Make sure we can make use of concurrent parsing
+	#Check if the list is long enough to segment
 	total_length="${#list[@]}"
 	if [ "$total_length" -gt "64" ] && [ "$(nproc)" -gt "1" ]; then
 		segs=$max_segs
@@ -20,11 +20,11 @@ function parseList(){
 		segs=1
 	fi
 	
-	#Check to see how evenly it splits
+	#Get the length and remainder for the segments to use
 	remainder=$(($total_length%$segs))
 	seg_length=$((total_length/$segs))
 	
-	#Start concurrent parsing, call the function and send some arguments
+	#Call the function sent and send which segment this is, its length & remainder, and the list
 	for segment in $(seq "0" $((segs-1))); do
 		if [[ "$segment" -eq "7" ]]; then
 			$func $segment $seg_length $remainder "${list[@]}" &
@@ -33,14 +33,14 @@ function parseList(){
 		fi
 	done
 	
+	#Return how many segments were used so results can be put back together
 	echo "$segs"
 }
 
-#-------------------------------------
-#------ Getting Node Information -----
-#-------------------------------------
+## Getting Node Information ##
+##############################
 configuredNode() {
-	#Get a target node and check it against the list of configured nodes
+	#Check the target node agains the list of configured nodes
 	target=$1
 	for item in "${nodelist[@]}"; do 
 		if [[ $target == $item ]]; then 
@@ -50,8 +50,7 @@ configuredNode() {
 	return 0
 }
 function parseNode() {
-	#Find out what segment we are, the length to look at, and if there's
-	#  a remainder
+	#Get arguments sent from the parseList function
 	segment=$1
 	seg_length=$2
 	remainder=$3
@@ -61,10 +60,11 @@ function parseNode() {
 	shift
 	list=("$@")
 
-	#Find start and end points for this segment, then clear the out file
+	#Calculate the starting and ending points of the segment
 	start=$(($segment*$seg_length))
 	end=$(($segment*$seg_length+$seg_length+$remainder-1))
 
+	#Clear (or create) the file where results will be put
 	> /tmp/parseNode.$segment
 
 	#Look at items between start and end, make sure it's configured then
@@ -91,13 +91,13 @@ function get_node_info() {
 	#output=(`cat ./large_node_info.txt`)
 	output=(`cat ./nodeInfo.txt`)
 	
-	#len=$((${#output[@]}-1))
-	#Try to concurrently parse the list for best speed
+	#Concurrently parse output to remove uneeded info
 	segs=$(parseList "parseNode" "${output[@]}")
 	
-	#Wait until it finished before reconstructing the list
+	#Wait for parsing to complete
 	wait
 	
+	#Combine results and return them
 	for x in $(seq 0 $((segs-1))); do
 		if [[ -a "/tmp/parseNode.$x" ]]; then
 			temp=($(cat /tmp/parseNode.$x))
@@ -107,24 +107,24 @@ function get_node_info() {
 	echo "${combined[@]}"
 }
 
-#--------------------------------------
-#------  Getting Job Information  -----
-#--------------------------------------
+## Getting Job Information ##
+#############################
 function get_job_info() {
+	#Call squeue with some arguments to only get info needed
 	#output=(`$slurm_bin/squeue -h -o '%P,%t,%C'`)
+	
 	#output=(`cat ./large_job_info.txt`)
 	#output=(`cat ./medium_job_info.txt`)
 	output=(`cat ./jobInfo.txt`)
 	#output=(`cat ./small_job_info.txt`)
+	
 	echo ${output[@]}
 }
 
-#--------------------------------------
-#-------- RRD Update Functions --------
-#--------------------------------------
+## RRD Update Functions ##
+##########################
 function totalNodeSeg() {
-	#Find out what segment we are, the length to look at, and if there's
-	#  a remainder we have
+	#Same beginning as other functions used in parseList
 	segment=$1
 	seg_length=$2
 	remainder=$3
@@ -134,18 +134,16 @@ function totalNodeSeg() {
 	shift
 	list=("$@")
 
-	busy=0
-	idle=0
-	down=0
-
-	#Find start and end points for this segment, then clear the out file
 	start=$(($segment*$seg_length))
 	end=$(($segment*$seg_length+$seg_length+$remainder-1))
 
 	> /tmp/totalNodeSeg.$segment
 
-	#For each item find busy, idle, down cores, add them up and send them
-	#  to a temp file
+	busy=0
+	idle=0
+	down=0
+
+	#For each item find busy, idle, down cores and add them up
 	for index in `seq $start $end`; do
 		item=($(echo ${list[$index]} | sed 's/,/ /g'))
 		name=$(echo ${item[0]})
@@ -168,18 +166,18 @@ function totalNodeSeg() {
 	echo "$busy-$idle-$down" > /tmp/totalNodeSeg.$segment
 }
 function node_total() {
-	#Get the node info array and init some variables
+	#Get the node info
 	array=("$@")
+	
 	totBusy=0
 	totIdle=0
 	totDown=0
 	
-	#Parse the node info list to get total numbers of busy, idle, and offline
+	#Parse the node info to get total busy, idle, and down cores
 	segs=$(parseList "totalNodeSeg" "${array[@]}")
-	
 	wait
 	
-	#Get info from all segments after they've finished and add them up
+	#Construct results
 	for x in $(seq 0 $((segs-1))); do
 		if [[ -a "/tmp/totalNodeSeg.$x" ]]; then
 			temp=($(cat /tmp/totalNodeSeg.$x | sed 's/-/ /g'))
@@ -192,7 +190,7 @@ function node_total() {
 		fi
 	done
 
-	#Determine where to log to
+	#Set where some logging output goes to
 	case "$log_level" in
 	0)
 	  verbose_logging=/dev/null
@@ -200,7 +198,7 @@ function node_total() {
 	;;
 	1)
 	  verbose_logging=/dev/null
-	  minimal_logging=$log_loc/all_total_cpu.log
+	  minimal_logging=$log_loc/all_total_cpu.log 2>&1
 	;;
 	2) 
 	  verbose_logging=$log_loc/all_total_cpu.log 2>&1
@@ -213,8 +211,7 @@ function node_total() {
 #	rrdtool update $rrd_loc/all_group.rrd -t busy:idle:offline `date +%s`:$totAlloc:$totIdle:$totDown >> $minimal_logging &
 }
 function groupNodeSeg() {
-	#Find out what segment we are, the length to look at, and if there's
-	#  a remainder we have
+	#parseList beginning
 	segment=$1
 	seg_length=$2
 	remainder=$3
@@ -224,33 +221,25 @@ function groupNodeSeg() {
 	shift
 	list=("$@")
 
-	busy=0
-	idle=0
-	down=0
-
 	#Find start and end points for this segment, then clear the out file
 	start=$(($segment*$seg_length))
 	end=$(($segment*$seg_length+$seg_length+$remainder-1))
 
 	> /tmp/groupNodeSeg.$segment
-
+	
+	busy=0
+	idle=0
+	down=0
+	
 	#Set up a dictionary for each group to have 3 variables available
 	declare -A dictionary
-	for group in "${grouplist[@]}"; do
-		temp="-b"
-		T_busy=$group$temp
-		temp="-i"
-		T_idle=$group$temp
-		temp="-d"
-		T_down=$group$temp
-		
-		dictionary[$T_busy]=0
-		dictionary[$T_idle]=0
-		dictionary[$T_down]=0
+	for grp in "${grouplist[@]}"; do		
+		dictionary["$grp-b"]=0
+		dictionary["$grp-i"]=0
+		dictionary["$grp-d"]=0
 	done
 
-	#For each item find busy, idle, down cores, add them up and send them
-	#  to a temp file
+	#For each item find busy, idle, down cores, and add them up
 	for index in `seq $start $end`; do
 		item=($(echo ${list[$index]} | sed 's/,/ /g'))
 		name=$(echo ${item[0]})
@@ -270,8 +259,9 @@ function groupNodeSeg() {
 		
 		#Find which group this node belongs to and add to busy-idle-down
 		
-		#Remove any numbers and special characters from the name to get
-		#  a group
+		# This part may need to be modified later to be more abstract
+		
+		#Remove any numbers and special characters from the name to get a group name
 		grp=$(echo $name | sed 's/[0-9!@#$%^&*)(_+=-].*//g')
 		
 		#Check to see if it's a group that's configured
@@ -279,86 +269,61 @@ function groupNodeSeg() {
 			t1=$1
 			shift
 			l=("$@")
-			[[ ${l[@]} =~ $t1 ]] && echo "true" || echo "false"
+			for i in ${l[@]}; do
+				if 
+			done
+			#[[ ${l[@]} =~ $t1 ]] && echo "true" || echo "false"
 		}
 		
 		inGroup=$(contains $grp ${grouplist[@]})
 		
 		#If it's configured add it to the proper place in the dictionary
 		if [[ "$inGroup" == "true" ]]; then
-			temp="-b"
-			T_busy=$grp$temp
-			temp="-i"
-			T_idle=$grp$temp
-			temp="-d"
-			T_down=$grp$temp
-			
-			dictionary[$T_busy]=$((dictionary[$T_busy]+busy))
-			dictionary[$T_idle]=$((dictionary[$T_idle]+idle))
-			dictionary[$T_down]=$((dictionary[$T_down]+down))
+			dictionary["$grp-b"]=$((dictionary[$T_busy]+busy))
+			dictionary["$grp-i"]=$((dictionary[$T_idle]+idle))
+			dictionary["$grp-d"]=$((dictionary[$T_down]+down))
 		fi
-		
 	done
 
 	#Write the results of each group to a temp file
-	for group in "${grouplist[@]}"; do
-		temp="-b"
-		T_busy=$group$temp
-		temp="-i"
-		T_idle=$group$temp
-		temp="-d"
-		T_down=$group$temp
-		
-		echo "$group-${dictionary[$T_busy]}-${dictionary[$T_idle]}-${dictionary[$T_down]}" >> /tmp/groupNodeSeg.$segment
+	for grp in "${grouplist[@]}"; do		
+		echo "$group-${dictionary[$grp-b]}-${dictionary[$grp-i]}-${dictionary[$grp-d]}" >> /tmp/groupNodeSeg.$segment
 	done
 }
 function node_group() {
+	#Get node info
 	array=("$@")
 
+	#Parse node info to get group breakdown of data
 	segs=$(parseList "groupNodeSeg" "${array[@]}")
 	wait
 
 	#Set up the dictionary to put results in
 	declare -A dictionary
-	for group in "${grouplist[@]}"; do
-		temp="-b"
-		T_busy=$group$temp
-		temp="-i"
-		T_idle=$group$temp
-		temp="-d"
-		T_down=$group$temp
-		
-		dictionary[$T_busy]=0
-		dictionary[$T_idle]=0
-		dictionary[$T_down]=0
+	for grp in "${grouplist[@]}"; do		
+		dictionary["$grp-b"]=0
+		dictionary["$grp-i"]=0
+		dictionary["$grp-d"]=0
 	done
 
-	#Open each file and read each line in, chop and disperse results
-	#  to the dictionary
+	#Read in results line by line, chop it up and store in dictionary
 	for x in $(seq 0 $((segs-1))); do
 		temp=(`cat /tmp/groupNodeSeg.$x`)
 		for line in "${temp[@]}"; do
 			items=(`echo $line | sed 's/-/ /g'`)
-			group=${items[0]}
+			grp=${items[0]}
 			busy=${items[1]}
 			idle=${items[2]}
 			down=${items[3]}
 
-			temp="-b"
-			T_busy=$group$temp
-			temp="-i"
-			T_idle=$group$temp
-			temp="-d"
-			T_down=$group$temp
-
-			dictionary[$T_busy]=$((dictionary[$T_busy]+busy))
-			dictionary[$T_idle]=$((dictionary[$T_idle]+idle))
-			dictionary[$T_down]=$((dictionary[$T_down]+down))
+			dictionary["$grp-b"]=$((dictionary["$grp-b"]+busy))
+			dictionary["$grp-i"]=$((dictionary["$grp-i"]+idle))
+			dictionary["$grp-d"]=$((dictionary["$grp-d"]+down))
 		done
 	done
 
-	#Determine where to log to
-	for group in "${grouplist[@]}"; do
+	#Set log output
+	for grp in "${grouplist[@]}"; do
 		case "$log_level" in
 		0)
 		  verbose_logging=/dev/null
@@ -374,21 +339,13 @@ function node_group() {
 		;;
 		esac
 		
-		temp="-b"
-		T_busy=$group$temp
-		temp="-i"
-		T_idle=$group$temp
-		temp="-d"
-		T_down=$group$temp
-		
 		#Update and Report
-		echo "`date +%s`-${dictionary[$T_busy]}-${dictionary[$T_idle]}-${dictionary[$T_down]}" #>> $verbose_logging
+		echo "`date +%s`-${dictionary[$grp-b]}-${dictionary[$grp-i]}-${dictionary[$grp-d]}" #>> $verbose_logging
 		#rrdtool update $rrd_loc/"$group"_group.rrd -t busy:idle:offline `date +%s`:${dictionary[$T_busy]}:${dictionary[$T_idle]}:${dictionary[$T_down]} >> $minimal_logging &
 	done
 }
 function node_indiv() {
-	#Find out what segment we are, the length to look at, and if there's
-	#  a remainder we have
+	#parseList beginning, without regular parseList function name
 	segment=$1
 	seg_length=$2
 	remainder=$3
@@ -401,6 +358,7 @@ function node_indiv() {
 	start=$(($segment*$seg_length))
 	end=$(($segment*$seg_length+$seg_length+$remainder-1))
 	
+	#For each node all that's needed is to chop up the input line and store it in its RRD file
 	for index in $(seq $start $end); do
 		node="${list[$index]}"
 		nodeName=$(echo $node | cut -f1 -d ',')
@@ -428,8 +386,7 @@ function node_indiv() {
 	done
 }
 function totalPartSeg() {
-	#Find out what segment we are, the length to look at, and if there's
-	#  a remainder we have
+	#parseList beginning
 	segment=$1
 	seg_length=$2
 	remainder=$3
@@ -455,6 +412,8 @@ function totalPartSeg() {
 	r129_256=0
 	r257_512=0
 	rGT512=0
+	
+	#Look at each job, check its state, and if it's turned on add to the proper corejob category
 	for index in $(seq $start $end); do
 		jobState=$(echo "${array[$index]}" | cut -f2 -d ',')
 		case "$jobState" in
@@ -478,47 +437,52 @@ function totalPartSeg() {
 		fi
 	done
 
+	#Write to segment
 	echo "$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" > /tmp/totalPartSeg.$segment
 }
 function part_total() {
-	#Send the array through the parser, reconstruct the temp files,
-	#  then report and update
+	#Get job info
 	array=("$@")
 
+	#Parse job info
 	segs=$(parseList "totalPartSeg" "${array[@]}")
-
 	wait
 	
+	#Reconstruct results
 	for segment in $(seq "0" $(($segs-1))); do
 		loc=/tmp/totalPartSeg.$segment
 		t_q="$(cat $loc | cut -f1 -d '-')"
 		t_r="$(cat $loc | cut -f2 -d '-')"
-		t_r1="$(cat $loc | cut -f3 -d '-')"
-		t_r2="$(cat $loc | cut -f4 -d '-')"
-		t_r3_4="$(cat $loc | cut -f5 -d '-')"
-		t_r5_8="$(cat $loc | cut -f6 -d '-')"
-		t_r9_16="$(cat $loc | cut -f7 -d '-')"
-		t_r17_32="$(cat $loc | cut -f8 -d '-')"
-		t_r33_64="$(cat $loc | cut -f9 -d '-')"
-		t_r65_128="$(cat $loc | cut -f10 -d '-')"
-		t_r129_256="$(cat $loc | cut -f11 -d '-')"
-		t_r257_512="$(cat $loc | cut -f12 -d '-')"
-		t_rGT512="$(cat $loc | cut -f13 -d '-')"
 		totQueued=$(($totQueued+$t_q))
 		totRunning=$(($totRunning+$t_r))
-		r1=$(($r1+$t_r1))
-		r2=$(($r2+$t_r2)) 
-		r3_4=$(($r3+$t_r3_4))
-		r5_8=$(($r5_8+$t_r5_8))
-		r9_16=$(($r9_16+$t_r9_16))
-		r17_32=$(($r17_32+$t_r17_32))
-		r33_64=$(($r33_64+$t_r33_64))
-		r65_128=$(($r65_128+$t_r65_128))
-		r129_256=$(($r129_256+$t_r129_256))
-		r257_512=$(($r257_512+$t_r257_512))
-		rGT512=$(($rGT512+$t_rGT512))
+		
+		if [[ "$corejob_graphing" == "true" ]]; then
+			t_r1="$(cat $loc | cut -f3 -d '-')"
+			t_r2="$(cat $loc | cut -f4 -d '-')"
+			t_r3_4="$(cat $loc | cut -f5 -d '-')"
+			t_r5_8="$(cat $loc | cut -f6 -d '-')"
+			t_r9_16="$(cat $loc | cut -f7 -d '-')"
+			t_r17_32="$(cat $loc | cut -f8 -d '-')"
+			t_r33_64="$(cat $loc | cut -f9 -d '-')"
+			t_r65_128="$(cat $loc | cut -f10 -d '-')"
+			t_r129_256="$(cat $loc | cut -f11 -d '-')"
+			t_r257_512="$(cat $loc | cut -f12 -d '-')"
+			t_rGT512="$(cat $loc | cut -f13 -d '-')"
+			r1=$(($r1+$t_r1))
+			r2=$(($r2+$t_r2)) 
+			r3_4=$(($r3+$t_r3_4))
+			r5_8=$(($r5_8+$t_r5_8))
+			r9_16=$(($r9_16+$t_r9_16))
+			r17_32=$(($r17_32+$t_r17_32))
+			r33_64=$(($r33_64+$t_r33_64))
+			r65_128=$(($r65_128+$t_r65_128))
+			r129_256=$(($r129_256+$t_r129_256))
+			r257_512=$(($r257_512+$t_r257_512))
+			rGT512=$(($rGT512+$t_rGT512))
+		fi
 	done
 
+	#Set log output location
 	case "$log_level" in
 		0)
 		  verbose_logging=/dev/null
@@ -534,6 +498,7 @@ function part_total() {
 		;;
 	esac
 
+	#Update and report based on what's being tracked
 	if [[ "$corejob_graphing" == "true" ]]; then
 		  echo "`date +%s`-$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" #>> $verbose_logging
 #		  rrdtool update $rrd_loc/all_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $minimal_logging &
@@ -545,8 +510,7 @@ function part_total() {
 	fi
 }
 function indivPartSeg() {
-	#Find out what segment we are, the length to look at, and if there's
-	#  a remainder we have
+	#parseList beginning
 	segment=$1
 	seg_length=$2
 	remainder=$3
@@ -558,7 +522,9 @@ function indivPartSeg() {
 	
 	start=$(($segment*$seg_length))
 	end=$(($segment*$seg_length+$seg_length+$remainder-1))
-
+	
+	> /tmp/indivPartSeg.$segment
+	
 	r1=0
 	r2=0
 	r3_4=0
@@ -571,7 +537,7 @@ function indivPartSeg() {
 	r257_512=0
 	rGT512=0
 	
-	#Set up a section in the dictionary for each partition
+	#Set up a dictionary for each partition
 	declare -A dictionary
 	for part in "${partitionlist[@]}"; do
 		dictionary["$part-q"]=0
@@ -591,14 +557,14 @@ function indivPartSeg() {
 		fi
 	done
 	
-	> /tmp/indivPartSeg.$segment
-	
+	#For each job add to the partition it's in
 	for index in $(seq $start $end); do
-		partition=$(echo "${array[$index]}" | cut -f1 -d ',')
+		part=$(echo "${array[$index]}" | cut -f1 -d ',')
 		
+		#Might re-write this to be like other similar sections
 		inPart="false"
 		for item in ${partitionlist[@]}; do
-			if [[ "$partition" == "$item" ]]; then 
+			if [[ "$part" == "$item" ]]; then 
 				inPart="true"
 				break
 			fi
@@ -608,23 +574,23 @@ function indivPartSeg() {
 		
 		jobState=$(echo "${array[$index]}" | cut -f2 -d ',')
 		case "$jobState" in
-			"PD") dictionary["$partition-q"]=$((dictionary["$partition-q"]+1));;
-			"R") dictionary["$partition-r"]=$((dictionary["$partition-r"]+1));;
+			"PD") dictionary["$part-q"]=$((dictionary["$part-q"]+1));;
+			"R") dictionary["$part-r"]=$((dictionary["$part-r"]+1));;
 		esac
 
-		if [[ "$corejob_graphing" == "true" ]] && [[ $jobState == "R" ]]; then
+		if [[ "$corejob_graphing" == "true" ]] && [[ "$jobState" == "R" ]]; then
 			jobCores=$(echo  "${array[$index]}" | cut -f3 -d ',')
-			if [[ $jobCores == 1 ]]; then dictionary["$partition-1"]=$((dictionary["$partition-1"]+1)); fi
-			if [[ $jobCores == 2 ]]; then dictionary["$partition-2"]=$((dictionary["$partition-2"]+2)); fi
-			if [[ $jobCores -ge 3 && $jobCores -le 4 ]]; then dictionary["$partition-3"]=$((dictionary["$partition-3"]+$jobCores)); fi
-			if [[ $jobCores -ge 5 && $jobCores -le 8 ]]; then dictionary["$partition-4"]=$((dictionary["$partition-4"]+$jobCores)); fi
-			if [[ $jobCores -ge 9 && $jobCores -le 16 ]]; then dictionary["$partition-5"]=$((dictionary["$partition-5"]+$jobCores)); fi
-			if [[ $jobCores -ge 17 && $jobCores -le 32 ]]; then dictionary["$partition-6"]=$((dictionary["$partition-6"]+$jobCores)); fi
-			if [[ $jobCores -ge 33 && $jobCores -le 64 ]]; then dictionary["$partition-7"]=$((dictionary["$partition-7"]+$jobCores)); fi
-			if [[ $jobCores -ge 65 && $jobCores -le 128 ]]; then dictionary["$partition-8"]=$((dictionary["$partition-8"]+$jobCores)); fi
-			if [[ $jobCores -ge 129 && $jobCores -le 256 ]]; then dictionary["$partition-9"]=$((dictionary["$partition-9"]+$jobCores)); fi
-			if [[ $jobCores -ge 257 && $jobCores -le 512 ]]; then dictionary["$partition-10"]=$((dictionary["$partition-10"]+$jobCores)); fi
-			if [[ $jobCores -gt 512 ]]; then dictionary["$partition-11"]=$((dictionary["$partition-11"]+$jobCores)); fi
+			if [[ $jobCores == 1 ]]; then dictionary["$part-1"]=$((dictionary["$part-1"]+1)); fi
+			if [[ $jobCores == 2 ]]; then dictionary["$part-2"]=$((dictionary["$part-2"]+2)); fi
+			if [[ $jobCores -ge 3 && $jobCores -le 4 ]]; then dictionary["$part-3"]=$((dictionary["$part-3"]+$jobCores)); fi
+			if [[ $jobCores -ge 5 && $jobCores -le 8 ]]; then dictionary["$part-4"]=$((dictionary["$part-4"]+$jobCores)); fi
+			if [[ $jobCores -ge 9 && $jobCores -le 16 ]]; then dictionary["$part-5"]=$((dictionary["$part-5"]+$jobCores)); fi
+			if [[ $jobCores -ge 17 && $jobCores -le 32 ]]; then dictionary["$part-6"]=$((dictionary["$part-6"]+$jobCores)); fi
+			if [[ $jobCores -ge 33 && $jobCores -le 64 ]]; then dictionary["$part-7"]=$((dictionary["$part-7"]+$jobCores)); fi
+			if [[ $jobCores -ge 65 && $jobCores -le 128 ]]; then dictionary["$part-8"]=$((dictionary["$part-8"]+$jobCores)); fi
+			if [[ $jobCores -ge 129 && $jobCores -le 256 ]]; then dictionary["$part-9"]=$((dictionary["$part-9"]+$jobCores)); fi
+			if [[ $jobCores -ge 257 && $jobCores -le 512 ]]; then dictionary["$part-10"]=$((dictionary["$part-10"]+$jobCores)); fi
+			if [[ $jobCores -gt 512 ]]; then dictionary["$part-11"]=$((dictionary["$part-11"]+$jobCores)); fi
 		fi
 	done
 
@@ -637,14 +603,14 @@ function indivPartSeg() {
 	done
 }
 function part_indiv() {
+	#Get job info
 	array=("$@")
 	
+	#Parse job info
 	segs=$(parseList "indivPartSeg" "${array[@]}")
-	#parseList "indivPartSeg" "${array[@]}"
-	
 	wait
 	
-	#Create dictionary for all the values needed
+	#Create dictionary for each partition
 	declare -A dictionary
 	for part in "${partitionlist[@]}"; do
 		dictionary["$part-q"]=0
@@ -664,6 +630,7 @@ function part_indiv() {
 		fi
 	done
 	
+	#Reconstruct results
 	for x in $(seq 0 $((segs-1))); do
 		temp=(`cat /tmp/indivPartSeg.$x`)
 		for line in "${temp[@]}"; do
@@ -701,6 +668,7 @@ function part_indiv() {
 		done
 	done
 
+	#Update RRD file for each partition
 	for part in ${partitionlist[@]}; do
 		case "$log_level" in
 			0)
@@ -728,42 +696,36 @@ function part_indiv() {
 	done
 }
 
-#--------------------------------------
-#------- Main Program Commands --------
-#--------------------------------------
-#Get the information on the nodes and jobs, make sure to wait so all info is returned before continuing
-#get_node_info
-{
-if [ $node_totaling == "true" ] || [ $group_graphing == "true" ] || [ $node_graphing == "true" ]; then
+## Main Program Commands ##
+###########################
+#Get the information on the nodes and jobs
+if [ "$node_totaling" == "true" ] || [ $group_graphing == "true" ] || [ $node_graphing == "true" ]; then
 	node_info=($(get_node_info))
 fi
-if [ $part_totaling == "true" ] || [ $partition_graphing == "true" ]; then
+if [ "$part_totaling" == "true" ] || [ $partition_graphing == "true" ]; then
 	job_info=($(get_job_info))
 fi
 
 #Check what's configured to update and call the functions needed as background processes
-# Totaling takes the longest, sequential for now (bleh)
-if [[ $node_totaling == "true" ]]; then
+if [[ "$node_totaling" == "true" ]]; then
 		node_total "${node_info[@]}" &
 fi
-if [[ $part_totaling == "true" ]]; then
+
+if [[ "$part_totaling" == "true" ]]; then
 		part_total "${job_info[@]}" &
 fi
 
-#If grouping is enabled spawn a thread for each group to find info on that
-if [[ $group_graphing == "true" ]]; then
+if [[ "$group_graphing" == "true" ]]; then
 		node_group "${node_info[@]}" &
 fi
 
-#If individual node graphing is on spawn a thread for each node to work on
-if [[ $node_graphing == "true" ]]; then
+if [[ "$node_graphing" == "true" ]]; then
+		#No data dependency, doesn't need a host function to run, returned # of segments can be thrown out
 		parseList "node_indiv" "${node_info[@]}" >/dev/null &
 fi
 
-#If partition graphing is enabled spawn a thread for each partition in the conf
-if [[ $partition_graphing == "true" ]]; then
+if [[ "$partition_graphing" == "true" ]]; then
 	part_indiv "${job_info[@]}" &
 fi
 
 wait
-}
