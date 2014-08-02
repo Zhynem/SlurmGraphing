@@ -59,7 +59,6 @@ def getInputs(args):
 	#if (args.partition == "None" and args.graphType == "None" and args.group == "None"):
 	if (args.graphItem == 'None' or args.graphItem == 'NULL'):
 		initialize(args)
-#	args.lastType = str(args.form.getvalue('lastType')) Might not need
 
 def interpretInput(args):
 	#Based on the inputs (and config) recieved create a list of items that will be checked

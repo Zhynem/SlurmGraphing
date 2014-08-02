@@ -3,7 +3,6 @@
 #Read the .conf file
 source ./sgraphing.conf
 
-
 ## Segmented List Parsing ##
 ############################
 function parseList(){
@@ -702,10 +701,10 @@ function part_indiv() {
 ## Main Program Commands ##
 ###########################
 #Get the information on the nodes and jobs
-if [ "$node_totaling" == "true" ] || [ $group_graphing == "true" ] || [ $node_graphing == "true" ]; then
+if [ "$node_totaling" == "true" ] || [ "$group_graphing" == "true" ] || [ "$node_graphing" == "true" ]; then
 	node_info=($(get_node_info))
 fi
-if [ "$part_totaling" == "true" ] || [ $partition_graphing == "true" ]; then
+if [ "$part_totaling" == "true" ] || [ "$partition_graphing" == "true" ]; then
 	job_info=($(get_job_info))
 fi
 

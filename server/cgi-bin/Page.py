@@ -34,7 +34,6 @@ class arguments():
 			self.groupList=cfg.grouplist
 			self.nodeList=cfg.nodelist
 
-
 #Create the container
 args = arguments()
 

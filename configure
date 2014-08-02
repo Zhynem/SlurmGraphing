@@ -22,7 +22,9 @@ cat >&2 << EOF
 		
 		-cj || --corejob-graphing : Enable graphing for cores requested per job.
 		
-		-t || --totaling : Enable summation of jobs and/or node cores.
+		-nt || --node-totaling : Enable summation of node cores.
+		
+		-pt || --part-totaling : Enable summation of jobs.
 		
 		-td=1051200 || --time-duration=1051200 : Rows* in an RRD file.
 		
@@ -50,6 +52,7 @@ cat >&2 << EOF
 	
 	
 	**The path to SLURM Binaries must be set, all other variables will have default values set.
+	**  Path variable will be set to the current directory of SlurmGraphing
 
 EOF
 }
@@ -82,8 +85,12 @@ case $i in
 		corejob_graph="true"
 		shift
 	;;
-	-t|--totaling)
-		totaling="true"
+	-nt|--node-totaling)
+		node_totaling="true"
+		shift
+	;;
+	-pt|--part-totaling)
+		part_totaling="true"
 		shift
 	;;
 	--log-loc=*)
@@ -141,36 +148,80 @@ case $i in
 esac
 done
 
+#Checks for minimum versions of bash and python will go here eventually
+
 #Check variables, set un-important variables to default values, query for important ones
+#  Errors will print a statement and close
 if [[ -z "$sbin_loc" ]]; then
 	printf "Please enter the location of the SLURM binaries: "
-	read temp
-	while [[ ! -a "$temp/scontrol" ]]; do
-		printf "\nThe file 'scontrol' was not found in the directory specified.\nUse the format '/path/to/bin'\nPlease enter a new location: "
-		read temp
-	done
-else
+	read sbin_loc
+	#if [[ ! -a "$temp/scontrol" ]]; then
+	#	printf "\nThe file 'scontrol' was not found in the directory specified.\nUse the format '/path/to/bin'\n"
+	#fi
+#else
 	#Check for valid location (scontrol must be present)
-	if [[ ! -a "$sbin_loc/scontrol" ]]; then
-		echo "Error: Could not find scontrol. Exiting." >&2
-		exit 1
-	fi
+	#if [[ ! -a "$sbin_loc/scontrol" ]]; then
+	#	echo "Error: Could not find scontrol. Exiting." >&2
+	#	exit 1
+	#fi
 fi
 
-#sbin_loc="${i#*=}"
-#rrd_loc=$"${i#*=}"
-#part_graph="true"
-#group_graph="true"
-#node_graph="true"
-#corejob_graph="true"
-#totaling="true"
-#log_loc="${i#*=}"
-#log_level=$temp
-#time_duration="${i#*=}"
-#time_step="${i#*=}"
-##Display config
-#main_links="true"
-#node_columns="${i#*=}"
-#slider="false"
-#manual="true"
-#graph_script="${i#*=}"
+#If it wasn't set with a flag it will be set to the SlurmGraphing directory
+if [[ -z "$rrd_loc" ]]; then
+	rrd_loc=`pwd -P`/RRDFiles
+fi
+
+if [[ -z "$log_loc" ]]; then
+	log_loc=`pwd -P`/logs
+fi
+
+if [[ -z "$graph_script" ]]; then
+	graph_script=`pwd -P`/scripts/make_graph.sh
+fi
+
+if [[ -z "$part_graph" ]]; then
+	part_graph='false'
+fi
+
+if [[ -z "$group_graph" ]]; then
+	group_graph='false'
+fi
+
+if [[ -z "$node_graph" ]]; then
+	node_graph='false'
+fi
+
+if [[ -z "$corejob_graph" ]]; then
+	corejob_graph='false'
+fi
+
+if [[ -z "$node_totaling" ]]; then
+	node_totaling='false'
+fi
+
+if [[ -z "$part_totaling" ]]; then
+	part_totaling='false'
+fi
+#Debugging, output all variables to make sure values were set
+echo "------------------------
+sbin_loc: $sbin_loc
+rrd_loc: $rrd_loc
+log_loc: $log_loc
+
+part_graph: $part_graph
+group_graph: $group_graph
+node_graph: $node_graph
+corejob_graph: $corejob_graph
+node_totaling: $node_totaling
+part_totaling: $part_totaling
+
+log_level: $log_level
+time_duration: $time_duration
+time_step: $time_step
+
+main_links: $main_links
+node_columns: $node_columns
+slider: $slider
+manual: $manual
+graph_script: $graph_script
+------------------------"
