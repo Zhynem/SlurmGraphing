@@ -1,7 +1,9 @@
 #!/bin/bash
 
 #Read the .conf file
-source /rc/hyperion/SlurmGraphing/scripts/sgraphing.conf
+script_loc=$(readlink -f $0)
+script_dir=$(dirname $script_loc)
+source "$script_dir"/sgraphing.conf
 
 ## Segmented List Parsing ##
 ############################
