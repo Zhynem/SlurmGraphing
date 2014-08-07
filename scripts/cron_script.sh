@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #Read the .conf file
-source ./sgraphing.conf
+source /rc/hyperion/SlurmGraphing/scripts/sgraphing.conf
 
 ## Segmented List Parsing ##
 ############################
@@ -74,7 +74,7 @@ function parseNode() {
 		name=$(echo ${item[0]} | cut -f2 -d '=')
 		alloc=$(echo ${item[3]} | cut -f2 -d '=')
 		tot=$(echo ${item[5]} | cut -f2 -d '=')
-		state=$(echo ${item[17]} | cut -f2 -d '=')
+		state=$(echo ${item[17]} | cut -f2 -d '=' | sed 's/[0-9!@#$%^&*)(_+=-].*//g')
 		configuredNode "$name"
 		if [[ $? == 1 ]]; then
 			echo "$name,$alloc,$tot,$state" >> /tmp/parseNode.$segment
@@ -84,11 +84,7 @@ function parseNode() {
 function get_node_info() {
 	#Call scontrol to get current node info, remove spaces (newline will
 	# not be affected) to group each node into 1 item in a list for speedup
-	#output=$($slurm_bin/scontrol show node -o | sed 's/ /,/g')
-	
-	# At home, need to read file instead of calling scontrol
-	#output=(`cat ./large_node_info.txt`)
-	output=(`cat ./nodeInfo.txt`)
+	output=(`$slurm_bin/scontrol show node -o | sed 's/ /,/g'`)
 	
 	#Concurrently parse output to remove uneeded info
 	segs=$(parseList "parseNode" "${output[@]}")
@@ -110,12 +106,7 @@ function get_node_info() {
 #############################
 function get_job_info() {
 	#Call squeue with some arguments to only get info needed
-	#output=(`$slurm_bin/squeue -h -o '%P,%t,%C'`)
-	
-	#output=(`cat ./large_job_info.txt`)
-	#output=(`cat ./medium_job_info.txt`)
-	output=(`cat ./jobInfo.txt`)
-	#output=(`cat ./small_job_info.txt`)
+	output=(`$slurm_bin/squeue -h -o '%P,%t,%C'`)
 	
 	echo ${output[@]}
 }
@@ -206,8 +197,8 @@ function node_total() {
 	esac
 	
 	#Update and Report
-	echo "`date +%s`-$totBusy-$totIdle-$totDown" #>> $verbose_logging
-#	rrdtool update $rrd_loc/all_group.rrd -t busy:idle:offline `date +%s`:$totAlloc:$totIdle:$totDown >> $minimal_logging &
+	echo "`date +%s`-$totBusy-$totIdle-$totDown" >> $verbose_logging
+	rrdtool update $rrd_loc/all_group.rrd -t busy:idle:offline `date +%s`:$totBusy:$totIdle:$totDown >> $minimal_logging &
 }
 function groupNodeSeg() {
 	#parseList beginning
@@ -245,14 +236,14 @@ function groupNodeSeg() {
 		alloc=$(echo ${item[1]})
 		tot=$(echo ${item[2]})
 		state=$(echo ${item[3]})
-		
+		busy=0
+		idle=0
+		down=0		
 		busy=$alloc
-		
+		temp=$((tot-alloc))		
 		if [ "$state" == "ALLOCATED" ] || [ "$state" == "IDLE" ] || [ "$state" == "MIXED" ]; then
-			temp=$((tot-alloc))
 			idle=$temp
 		else
-			temp=$((tot-alloc))
 			down=$temp
 		fi
 		
@@ -277,19 +268,19 @@ function groupNodeSeg() {
 			#[[ ${l[@]} =~ $t1 ]] && echo "true" || echo "false"
 		}
 		
-		inGroup=$(contains $grp ${grouplist[@]})
+#		inGroup=$(contains $grp ${grouplist[@]})
 		
 		#If it's configured add it to the proper place in the dictionary
-		if [[ "$inGroup" == "true" ]]; then
+#		if [[ "$inGroup" == "true" ]]; then
 			dictionary["$grp-b"]=$((dictionary["$grp-b"]+busy))
 			dictionary["$grp-i"]=$((dictionary["$grp-i"]+idle))
 			dictionary["$grp-d"]=$((dictionary["$grp-d"]+down))
-		fi
+#		fi
 	done
 
 	#Write the results of each group to a temp file
 	for grp in "${grouplist[@]}"; do		
-		echo "$group-${dictionary[$grp-b]}-${dictionary[$grp-i]}-${dictionary[$grp-d]}" >> /tmp/groupNodeSeg.$segment
+		echo "$grp-${dictionary[$grp-b]}-${dictionary[$grp-i]}-${dictionary[$grp-d]}" >> /tmp/groupNodeSeg.$segment
 	done
 }
 function node_group() {
@@ -336,14 +327,14 @@ function node_group() {
 		  minimal_logging=$log_loc/"$group"_group.log
 		;;
 		2) 
-		  verbose_logging=$log_loc/"$group"_group.log 2>&1
-		  minimal_logging=$log_loc/"$group"_group.log 2>&1
+		  verbose_logging=$log_loc/"$grp"_group.log 2>&1
+		  minimal_logging=$log_loc/"$grp"_group.log 2>&1
 		;;
 		esac
 		
 		#Update and Report
-		echo "`date +%s`-${dictionary[$grp-b]}-${dictionary[$grp-i]}-${dictionary[$grp-d]}" #>> $verbose_logging
-		#rrdtool update $rrd_loc/"$group"_group.rrd -t busy:idle:offline `date +%s`:${dictionary[$T_busy]}:${dictionary[$T_idle]}:${dictionary[$T_down]} >> $minimal_logging &
+		echo "`date +%s`-${dictionary[$grp-b]}-${dictionary[$grp-i]}-${dictionary[$grp-d]}" >> $verbose_logging
+		rrdtool update $rrd_loc/"$grp"_group.rrd -t busy:idle:offline `date +%s`:${dictionary["$grp-b"]}:${dictionary["$grp-i"]}:${dictionary["$grp-d"]} >> $minimal_logging &
 	done
 }
 function node_indiv() {
@@ -362,11 +353,24 @@ function node_indiv() {
 	
 	#For each node all that's needed is to chop up the input line and store it in its RRD file
 	for index in $(seq $start $end); do
-		node="${list[$index]}"
-		nodeName=$(echo $node | cut -f1 -d ',')
-		nodeAlloc=$(echo $node | cut -f2 -d ',')
-		nodeIdle=$(echo $node | cut -f3 -d ',')
-		nodeDown=$(echo $node | cut -f4 -d ',')
+		item=($(echo ${list[$index]} | sed 's/,/ /g'))
+		name=$(echo ${item[0]})
+		alloc=$(echo ${item[1]})
+		tot=$(echo ${item[2]})
+		state=$(echo ${item[3]})
+
+		busy=0
+		idle=0
+		down=0	
+		temp=0
+		temp=$((tot-alloc))	
+		busy=$alloc
+		
+		if [ "$state" == "ALLOCATED" ] || [ "$state" == "IDLE" ] || [ "$state" == "MIXED" ]; then
+			idle=$temp
+		else
+			down=$temp
+		fi
 
 		case "$log_level" in
 		0)
@@ -378,13 +382,13 @@ function node_indiv() {
 		  minimal_logging=$log_loc/$nodeName_node.log
 		;;
 		2) 
-		  verbose_logging=$log_loc/"$nodeName"_node.log 2>&1
-		  minimal_logging=$log_loc/"$nodeName"_node.log 2>&1
+		  verbose_logging=$log_loc/"$name"_node.log 2>&1
+		  minimal_logging=$log_loc/"$name"_node.log 2>&1
 		;;
 		esac
 		
-		echo "`date +%s`-$nodeAlloc-$nodeIdle-$nodeDown" #>> $verbose_logging
-		#rrdtool update $rrd_loc/"$nodeName"_node.rrd -t busy:idle:offline `date +%s`:$nodeAlloc:$nodeIdle:$nodeDown >> $minimal_logging &
+		echo "`date +%s`-$busy-$idle-$down" >> $verbose_logging
+		rrdtool update $rrd_loc/"$name"_node.rrd -t busy:idle:offline `date +%s`:$busy:$idle:$down >> $minimal_logging &
 	done
 }
 function totalPartSeg() {
@@ -502,13 +506,12 @@ function part_total() {
 
 	#Update and report based on what's being tracked
 	if [[ "$corejob_graphing" == "true" ]]; then
-		  echo "`date +%s`-$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$r33_64-$r65_128-$r129_256-$r257_512-$rGT512" #>> $verbose_logging
-#		  rrdtool update $rrd_loc/all_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $minimal_logging &
-#		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
-
+		  echo `date +%s`-$totQueued-$totRunning-$r1-$r2-$r3_4-$r5_8-$r9_16-$r17_32-$33_64-$r65_128-$r129_256-$r257_512-$rGT512 >> $verbose_logging
+		  rrdtool update $rrd_loc/all_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $minimal_logging &
+		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
 	else
-		  echo "`date +%s`-$totQueued-$totRunning" #>> $verbose_logging
-#		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
+		  echo `date +%s`-$totQueued-$totRunning >> $verbose_logging
+		  rrdtool update $rrd_loc/all_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
 	fi
 }
 function indivPartSeg() {
@@ -688,12 +691,12 @@ function part_indiv() {
 		esac
 
 		if [[ "$corejob_graphing" == "true" ]]; then
-			  echo `date +%s`-${dictionary["$part-q"]}-${dictionary["$part-r"]}-${dictionary["$part-1"]}-${dictionary["$part-2"]}-${dictionary["$part-3"]}-${dictionary["$part-4"]}-${dictionary["$part-5"]}-${dictionary["$part-6"]}-${dictionary["$part-7"]}-${dictionary["$part-8"]}-${dictionary["$part-9"]}-${dictionary["$part-10"]}-${dictionary["$part-11"]} #>> $verbose_logging
-			  #rrdtool update $rrd_loc/"$part"_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:$r1:$r2:$r3_4:$r5_8:$r9_16:$r17_32:$r33_64:$r65_128:$r129_256:$r257_512:$rGT512 >> $minimal_logging &
-			  #rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
+			  echo `date +%s`-${dictionary["$part-q"]}-${dictionary["$part-r"]}-${dictionary["$part-1"]}-${dictionary["$part-2"]}-${dictionary["$part-3"]}-${dictionary["$part-4"]}-${dictionary["$part-5"]}-${dictionary["$part-6"]}-${dictionary["$part-7"]}-${dictionary["$part-8"]}-${dictionary["$part-9"]}-${dictionary["$part-10"]}-${dictionary["$part-11"]} >> $verbose_logging
+			  rrdtool update $rrd_loc/"$part"_part_corejob.rrd -t R1:R2:R3:R4:R5:R6:R7:R8:R9:R10:R11 `date +%s`:${dictionary["$part-1"]}:${dictionary["$part-2"]}:${dictionary["$part-3"]}:${dictionary["$part-4"]}:${dictionary["$part-5"]}:${dictionary["$part-6"]}:${dictionary["$part-7"]}:${dictionary["$part-8"]}:${dictionary["$part-9"]}:${dictionary["$part-10"]}:${dictionary["$part-11"]} >> $minimal_logging &
+			  rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:${dictionary["$part-q"]}:${dictionary["$part-r"]} >> $minimal_logging &
 		else
-			  echo `date +%s`-${dictionary[$part-q]}-${dictionary[$part-r]} #>> $verbose_logging
-			  #rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:$totQueued:$totRunning >> $minimal_logging &
+			  echo `date +%s`-${dictionary[$part-q]}-${dictionary[$part-r]} >> $verbose_logging
+			  rrdtool update $rrd_loc/"$part"_part_queue.rrd -t queued:running `date +%s`:${dictionary["$part-q"]}:${dictionary["$part-r"]} >> $minimal_logging &
 		fi
 	done
 }
