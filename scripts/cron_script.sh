@@ -109,7 +109,6 @@ function get_node_info() {
 function get_job_info() {
 	#Call squeue with some arguments to only get info needed
 	output=(`$slurm_bin/squeue -h -o '%P,%t,%C'`)
-	
 	echo ${output[@]}
 }
 

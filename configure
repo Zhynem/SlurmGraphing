@@ -9,10 +9,16 @@ cat >&2 << EOF
   Configure arguments:
 
     Core arguments:
+    
+		-q : Quiet mode, nothing will be printed to the screen.
 
 		-sb=/path/to/bin || --slurm-bin=/path/to/bin : Path to SLURM binary files.
 		
 		-rl=/path/to/rrds || --rrd-loc=/path/to/rrds : Path to create RRD files.
+		
+		--cgi-dir=/path/to/cgi-bin : Path to store cgi scripts in.
+		
+		--html-dir=/path/to/html : Path to store html related files in.
 		
 		-pg || --partition-graphing : Enable graphing for configured partitions.
 		
@@ -32,7 +38,11 @@ cat >&2 << EOF
 		
 		--log-loc=/path/to/logs	: Path to create log files (if configured).
 		
+		--max-segs=8 : Set the maximum concurrent segments to run at a time ( >= 1).
+		
 		--log-level=2 : Set the amount of logging to do (0,1, or 2).
+		
+		--config-file-path=/path/to/file : Use an existing file to set configured nodes and partitions.
 		
 		*Given these example inputs the RRD files will store 1051200 minutes (2 years) of data
 			because the time step is 60 seconds. An example of less frequent polling would be:
@@ -43,6 +53,8 @@ cat >&2 << EOF
 		-ml || --main-links : Turn group images on the main page into links to the group breakdown.
 		
 		-nc=4 || --node-columns=4 : Number of columns in the table that displays individual nodes.
+		
+		--refresh=60 : Set amount of time before an auto-refresh of the web page.
 		
 		--no-slider : Disable the slider control (On by default)
 		
@@ -57,32 +69,46 @@ cat >&2 << EOF
 EOF
 }
 
+quiet="false"
+
 # Flag catching
 for i in "$@"
 do
 case $i in
+	-q)
+		quiet="true"
+		shift
+	;;
     -sb=*|--slurm-bin=*)
-		sbin_loc="${i#*=}"
+		slurm_bin="${i#*=}"
 	    shift
     ;;
 	-rl=*|--rrd-loc=*)
 		rrd_loc=$"${i#*=}"
 		shift
 	;;
+	--cgi-dir=*)
+		cgi_dir="${i#*=}"
+		shift
+	;;
+	--html-dir=*)
+		html_dir="${i#*=}"
+		shift
+	;;
 	-pg|--partition-graphing)
-		part_graph="true"
+		partition_graphing="true"
 		shift
 	;;
 	-gg|--group-graphing)
-		group_graph="true"
+		group_graphing="true"
 		shift
 	;;
 	-ng|--node-graphing)
-		node_graph="true"
+		node_graphing="true"
 		shift
 	;;
 	-cj|--corejob-graphing)
-		corejob_graph="true"
+		corejob_graphing="true"
 		shift
 	;;
 	-nt|--node-totaling)
@@ -97,6 +123,15 @@ case $i in
 		log_loc="${i#*=}"
 		shift
 	;;
+	--max-segs=*)
+		temp="${i#*=}"
+		if [[ "$temp" -lt "1" ]]; then
+			echo "Error: Must have 1 or more segments. Exiting." >&2
+			exit 1
+		fi
+		max_segs=$temp
+		shift
+	;;
 	--log-level=*)
 		temp="${i#*=}"
 		if [[ "$temp" -lt "0" || "$temp" -gt "2" ]]; then
@@ -106,6 +141,12 @@ case $i in
 			log_level=$temp
 		fi
 		shift		
+	;;
+	--config-file-path=*)
+		temp="${i#*=}"
+		file_loc=$(readlink -f $temp)
+		source $file_loc
+		shift
 	;;
 	-td=*|--time-duration=*)
 		time_duration="${i#*=}"
@@ -122,6 +163,10 @@ case $i in
 	;;
 	-nc=*|--node-columns=*)
 		node_columns="${i#*=}"
+		shift
+	;;
+	--refresh=*)
+		refresh="${i#*=}"
 		shift
 	;;
 	--no-slider)
@@ -152,17 +197,16 @@ done
 
 #Check variables, set un-important variables to default values, query for important ones
 #  Errors will print a statement and close
-if [[ -z "$sbin_loc" ]]; then
-	printf "Please enter the location of the SLURM binaries: "
-	read sbin_loc
+if [[ -z "$slurm_bin" ]]; then
+	if [[ "$quiet" == "false" ]]; then
+		printf "Please enter the location of the SLURM binaries: "
+		read slurm_bin
+	else
+		exit 1
+	fi
+	#If scontrol isn't in that location we can't operate
 	#if [[ ! -a "$temp/scontrol" ]]; then
 	#	printf "\nThe file 'scontrol' was not found in the directory specified.\nUse the format '/path/to/bin'\n"
-	#fi
-#else
-	#Check for valid location (scontrol must be present)
-	#if [[ ! -a "$sbin_loc/scontrol" ]]; then
-	#	echo "Error: Could not find scontrol. Exiting." >&2
-	#	exit 1
 	#fi
 fi
 
@@ -179,20 +223,20 @@ if [[ -z "$graph_script" ]]; then
 	graph_script=`pwd -P`/scripts/make_graph.sh
 fi
 
-if [[ -z "$part_graph" ]]; then
-	part_graph='false'
+if [[ -z "$partition_graphing" ]]; then
+	partition_graphing='false'
 fi
 
-if [[ -z "$group_graph" ]]; then
-	group_graph='false'
+if [[ -z "$group_graphing" ]]; then
+	group_graphing='false'
 fi
 
-if [[ -z "$node_graph" ]]; then
-	node_graph='false'
+if [[ -z "$node_graphing" ]]; then
+	node_graphing='false'
 fi
 
-if [[ -z "$corejob_graph" ]]; then
-	corejob_graph='false'
+if [[ -z "$corejob_graphing" ]]; then
+	corejob_graphing='false'
 fi
 
 if [[ -z "$node_totaling" ]]; then
@@ -202,26 +246,195 @@ fi
 if [[ -z "$part_totaling" ]]; then
 	part_totaling='false'
 fi
-#Debugging, output all variables to make sure values were set
-echo "------------------------
-sbin_loc: $sbin_loc
-rrd_loc: $rrd_loc
-log_loc: $log_loc
 
-part_graph: $part_graph
-group_graph: $group_graph
-node_graph: $node_graph
-corejob_graph: $corejob_graph
-node_totaling: $node_totaling
-part_totaling: $part_totaling
+if [[ -z "$max_segs" ]]; then
+	max_segs=1
+fi
 
-log_level: $log_level
-time_duration: $time_duration
-time_step: $time_step
+if [[ -z "$log_level" ]]; then
+	log_level=1
+fi
 
-main_links: $main_links
-node_columns: $node_columns
-slider: $slider
-manual: $manual
-graph_script: $graph_script
-------------------------"
+if [[ -z "$cgi_dir" ]]; then
+	cgi_dir=`pwd -P`/server/cgi-bin
+fi
+
+if [[ -z "$html_dir" ]]; then
+	html_dir=`pwd -P`/server/html
+fi
+
+if [[ -z "$time_duration" ]]; then
+	time_duration=525600
+fi
+
+if [[ -z "$time_step" ]]; then
+	time_step=60
+fi
+
+if [[ -z "$main_links" ]]; then
+	main_links='true'
+fi
+
+if [[ -z "$node_columns" ]]; then
+	node_columns=4
+fi
+
+if [[ -z "$slider" ]]; then
+	slider='true'
+fi
+
+if [[ -z "$manual" ]]; then
+	manual='false'
+fi
+
+if [[ -z "$refresh" ]]; then
+	refresh=60
+fi
+
+#Determine partitions, groups, and nodes
+if [ -z "$partiionlist" ] && ([ "$partition_graphing" == "true" ] || [ "$part_totaling" == "true" ]); then
+	#scontrol show partition -o | sed 's/ /,/g' to get all partition info to get names
+	p_info=($(cat parts.txt))
+	for item in ${p_info[@]}; do
+		name=$(echo $item | cut -f1 -d ',')
+		name=$(echo $name | cut -f2 -d '=')
+		partitionlist=(${partitionlist[@]} $name)
+	done
+	
+	if [[ "$quiet" == "false" ]]; then
+		echo -e "\nPartitions found: ${partitionlist[@]}"
+		printf "Are these correct? (y/n): "
+		read correct
+		while [ "$correct" != "Y" ] && [ "$correct" != "y" ] && [ "$correct" != "N" ] && [ "$correct" != "n" ]; do
+			printf "Please enter Y/y or N/n: "
+			read correct
+		done
+		while [ "$correct" == "N" ] || [ "$correct" == "n" ]; do
+			printf "Enter the name of the partition to remove: "
+			read rem
+			partitionlist=(${partitionlist[@]/$rem/})
+			echo -e "\nPartitions found: ${partitionlist[@]}"
+			printf "Are these correct? (y/n): "
+			read correct
+			while [ "$correct" != "Y" ] && [ "$correct" != "y" ] && [ "$correct" != "N" ] && [ "$correct" != "n" ]; do
+				printf "Please enter Y/y or N/n: "
+				read correct
+			done
+		done
+	fi
+fi
+
+if [ -z "$grouplist" ] && [ "$group_graphing" == "true" ]; then
+	#scontrol show node -o | sed 's/ /,/g' to get node info
+	g_info=($(cat nodes.txt))
+	for item in ${g_info[@]}; do
+		name=$(echo $item | cut -f1 -d ',')
+		name=$(echo $name | cut -f2 -d '=')
+		name=$(echo $name | sed 's/[0-9!@#$%^&*)(_+=-].*//g')
+		grouplist=(${grouplist[@]} $name)
+	done
+
+	grouplist=($(printf "%s\n" "${grouplist[@]}" | sort -u))
+	
+	if [[ "$quiet" == "false" ]]; then
+		echo -e "\nGroups found: ${grouplist[@]}"
+		printf "Are these correct? (y/n): "
+		read correct
+		while [ "$correct" != "Y" ] && [ "$correct" != "y" ] && [ "$correct" != "N" ] && [ "$correct" != "n" ]; do
+			printf "Please enter Y/y or N/n: "
+			read correct
+		done
+		while [ "$correct" == "N" ] || [ "$correct" == "n" ]; do
+			printf "Enter the name of the group to remove: "
+			read rem
+			grouplist=(${grouplist[@]/$rem/})
+			echo -e "\nGroups found: ${grouplist[@]}"
+			printf "Are these correct? (y/n): "
+			read correct
+			while [ "$correct" != "Y" ] && [ "$correct" != "y" ] && [ "$correct" != "N" ] && [ "$correct" != "n" ]; do
+				printf "Please enter Y/y or N/n: "
+				read correct
+			done
+		done
+	fi
+fi
+
+if [ -z "$nodelist" ] && ([ "$node_graphing" == "true" ] || [ "$node_totaling" == "true" ]); then
+	#scontrol show node -o | sed 's/ /,/g' to get node info
+	n_info=($(cat nodes.txt))
+	for item in "${n_info[@]}"; do
+		name=$(echo $item | cut -f1 -d ',')
+		name=$(echo $name | cut -f2 -d '=')
+		nodelist=(${nodelist[@]} $name)
+	done
+	
+	if [[ "$quiet" == "false" ]]; then
+		echo -e "\nA list of all nodes has been generated based on scontrol output.\nWhen this is finished please double check that it contains all nodes you wish to track.\n"
+	fi
+fi
+
+#Write sgraphing.conf
+echo "## Paths ##
+###########
+slurm_bin=$slurm_bin
+rrd_loc=$rrd_loc
+log_loc=$log_loc
+
+## Items to Track ##
+####################
+node_totaling=$node_totaling
+group_graphing=$group_graphing
+node_graphing=$node_graphing
+part_totaling=$part_totaling
+partition_graphing=$partition_graphing
+corejob_graphing=$corejob_graphing
+
+## Misc Config ##
+#################
+max_segs=$max_segs
+log_level=$log_level
+cgi_dir=$cgi_dir
+html_dir=$html_dir
+
+## RRD Configuration ##
+#######################
+time_duration=$time_duration
+time_step=$time_step
+
+## Configured Lists ##
+######################
+partitionlist=(${partitionlist[@]})
+grouplist=(${grouplist[@]})
+nodelist=(${nodelist[@]})" > sgraphing.conf #`pwd -P`/scripts/sgraphing.conf2
+
+#Write config.py
+echo "## Items to Track ##
+####################
+partition_graphing='$partition_graphing'
+group_graphing='$group_graphing'
+node_graphing='$node_graphing'
+corejob_graphing='$corejob_graphing'
+node_totaling='$node_totaling'
+part_totaling='$part_totaling'
+
+## Page Config ##
+#################
+main_links='$main_links'
+node_columns=$node_columns
+slider='$slider'
+manual='$manual'
+refresh=$refresh
+
+## Path to Script ##
+####################
+graph_script='$graph_script'
+
+## Configured Item Lists ##
+###########################
+partitionlist=$(echo "[\"$(echo ${partitionlist[@]} | sed 's/ /","/g')\"]")
+grouplist=$(echo "[\"$(echo ${grouplist[@]} | sed 's/ /","/g')\"]")
+nodelist=$(echo "[\"$(echo ${nodelist[@]} | sed 's/ /","/g')\"]")
+
+## Debugging ##
+###############
+debugging='false'" > config.py # > $cgi_dir/config.py
