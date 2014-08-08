@@ -89,8 +89,7 @@ def interpretInput(args):
 		else:
 			args.checked_list["Cores"] = ""
 
-	if args.totaling == 'true':
-		args.partList.append("all")
+	if args.node_totaling == 'true':
 		args.groupList.append("all")
 		if args.group == 'total':
 			args.checked_list['all'] = "Checked"
@@ -104,6 +103,9 @@ def interpretInput(args):
 		else:
 			args.checked_list['all'] = ""
 	
+	if args.part_totaling == 'true':
+		args.partList.append("all")
+
 	if(args.g_graphing == 'false' and args.n_graphing == 'true' and args.group == 'total'):
 		args.group = ""
 			

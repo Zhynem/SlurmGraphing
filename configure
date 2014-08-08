@@ -304,9 +304,8 @@ fi
 
 #Determine partitions, groups, and nodes
 if [ -z "$partiionlist" ] && ([ "$partition_graphing" == "true" ] || [ "$part_totaling" == "true" ]); then
-	#scontrol show partition -o | sed 's/ /,/g' to get all partition info to get names
+	p_info=(`$slurm_bin/scontrol show partition -o | sed 's/ /,/g'`)
 	#Add check to only get non-hidden partitons?
-	p_info=($(cat parts.txt))
 	for item in ${p_info[@]}; do
 		name=$(echo $item | cut -f1 -d ',')
 		name=$(echo $name | cut -f2 -d '=')
@@ -337,8 +336,7 @@ if [ -z "$partiionlist" ] && ([ "$partition_graphing" == "true" ] || [ "$part_to
 fi
 
 if [ -z "$grouplist" ] && [ "$group_graphing" == "true" ]; then
-	#scontrol show node -o | sed 's/ /,/g' to get node info
-	g_info=($(cat nodes.txt))
+	g_info=(`$slurm_bin/scontrol show node -o | sed 's/ /,/g'`)
 	for item in ${g_info[@]}; do
 		name=$(echo $item | cut -f1 -d ',')
 		name=$(echo $name | cut -f2 -d '=')
@@ -372,8 +370,7 @@ if [ -z "$grouplist" ] && [ "$group_graphing" == "true" ]; then
 fi
 
 if [ -z "$nodelist" ] && ([ "$node_graphing" == "true" ] || [ "$node_totaling" == "true" ]); then
-	#scontrol show node -o | sed 's/ /,/g' to get node info
-	n_info=($(cat nodes.txt))
+	n_info=(`$slurm_bin/scontrol show node -o | sed 's/ /,/g'`)
 	for item in "${n_info[@]}"; do
 		name=$(echo $item | cut -f1 -d ',')
 		name=$(echo $name | cut -f2 -d '=')
@@ -392,21 +389,6 @@ if [[ "$quiet" == "false" ]]; then
 	$cgi_dir/config.py
 	
 It is recommended to double check these files to ensure all options are set correctly.\n"
-
-	echo -e "Thank you for using the SlurmGraphing software. For any help please contact me at Michael.Luker@usu.edu\n"
-fi
-
-#Copy files to cgi and html directories, setup ownership of graph.log and the graphs folder
-cp `pwd -P`/server/cgi-bin/* $cgi_dir/
-cp `pwd -P`/server/html/ $html_dir/
-mkdir $html_dir/graphs
-chmod 777 $html_dir/graphs
-chown apache:apache $html_dir/graphs
-
-if [[ "$quiet" == "true" ]]; then
-	`pwd -P`/scripts/creation.sh > /dev/null
-else
-	`pwd -P`/scripts/creation.sh
 fi
 
 #Write sgraphing.conf
@@ -475,3 +457,48 @@ nodelist=$(echo "[\"$(echo ${nodelist[@]} | sed 's/ /","/g')\"]")
 ## Debugging ##
 ###############
 debugging='false'" > $cgi_dir/config.py
+
+
+
+#Autogen stuff
+#Copy files to cgi and html directories, setup ownership of graph.log and the graphs folder
+if [[ ! "$cgi_dir" == "`pwd -P`/server/cgi-bin" ]]; then
+	cp -u `pwd -P`/server/cgi-bin/* $cgi_dir/
+fi
+if [[ ! "$html_dir" == "`pwd -P`/server/html" ]]; then
+	cp -u `pwd -P`/server/html/ $html_dir/
+fi
+
+if [[ ! -d "$html_dir/graphs" ]]; then
+	mkdir $html_dir/graphs
+	chmod 777 $html_dir/graphs
+	chown apache:apache $html_dir/graphs
+fi
+
+if [[ ! -d "$rrd_loc" ]]; then
+	mkdir $rrd_loc
+fi
+if [[ ! -d "$log_loc" ]]; then
+	mkdir $log_loc
+fi
+
+touch $log_loc/graph.log
+chown apache:apache $log_loc/graph.log
+
+if [[ "$quiet" == "true" ]]; then
+	`pwd -P`/scripts/creation.sh > /dev/null
+else
+	echo "Creating RRD files, this may take a long time."
+	`pwd -P`/scripts/creation.sh
+fi
+
+wait
+
+echo "* * * * * `pwd -P`/scripts/cron_script.sh >> $log_loc/master.log" > tmp
+crontab tmp
+rm tmp
+
+
+if [[ "$quiet" == "false" ]]; then
+	echo -e "Thank you for using the SlurmGraphing software. For any help please contact me at Michael.Luker@usu.edu\n"
+fi

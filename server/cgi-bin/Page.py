@@ -20,10 +20,11 @@ class arguments():
 			self.period='NULL'
 			self.debugging=cfg.debugging
 			self.p_graphing=cfg.partition_graphing
-			self.jc_graphing=cfg.jobcore_graphing
+			self.jc_graphing=cfg.corejob_graphing
 			self.g_graphing=cfg.group_graphing
 			self.n_graphing=cfg.node_graphing			
-			self.totaling=cfg.totaling
+			self.node_totaling=cfg.node_totaling
+			self.part_totaling=cfg.part_totaling
 			self.max_segs=cfg.max_segs
 			self.main_links=cfg.main_links
 			self.node_columns=cfg.node_columns
