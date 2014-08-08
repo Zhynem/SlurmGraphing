@@ -59,6 +59,7 @@ def getInputs(args):
 	#if (args.partition == "None" and args.graphType == "None" and args.group == "None"):
 	if (args.graphItem == 'None' or args.graphItem == 'NULL'):
 		initialize(args)
+#	args.lastType = str(args.form.getvalue('lastType')) Might not need
 
 def interpretInput(args):
 	#Based on the inputs (and config) recieved create a list of items that will be checked
@@ -123,48 +124,91 @@ def interpretInput(args):
 def updateGraphs(args):
 	#Define the possible threads that will be used
 	class Cluster_Partition_Thread(threading.Thread):
-		def __init__(self, it, gt, per):
+		def __init__(self, sg, sl, rm, gt, pr):
 			super(Cluster_Partition_Thread, self).__init__()
-			self.item = it
+			self.seg = sg
+			self.seg_len = sl
+			self.remain = rm
 			self.graphType = gt
-			self.period = per
+			self.period = pr
 
 		def run(self):
-			subprocess.call([args.graph_script, str(self.item), str(self.graphType), str(self.period)])
+			start = self.seg * self.seg_len
+			end = (self.seg * self.seg_len) + (self.seg_len + self.remain)
+			for x in range(start, end):
+				if(args.graphType == "cores"):
+					item = args.groupList[x]
+				else:
+					item = args.partList[x]
+				subprocess.call([args.graph_script, str(item), str(self.graphType), str(self.period)])
 
 	class NodeThread(threading.Thread):
-		def __init__(self, it, per):
+		def __init__(self, sg, sl, rm, pr):
 			super(NodeThread, self).__init__()
-			self.item = it
-			self.period = per
+			self.seg = sg
+			self.seg_len = sl
+			self.remain = rm
+			self.period = pr
 
 		def run(self):
-			subprocess.call([args.graph_script, str(self.item), str('node'), str(self.period)])
+			start = self.seg * self.seg_len
+			end = (self.seg * self.seg_len) + (self.seg_len + self.remain)
+			for x in range(start, end):
+				item = args.nodeList[x]
+				if(args.group in item):
+					subprocess.call([args.graph_script, str(item), str('node'), str(self.period)])
 
 	#Object to hold all the threads that will be spawned
-	thread_objects = {}
+	threads = []
 
 	#Create the correct threads and start them
 	if(args.group != 'None' and args.group == 'total' and args.g_graphing == 'true'):
-		for item in args.groupList:
-			thread_objects[item] = Cluster_Partition_Thread(item, args.graphType, args.period)
-			thread_objects[item].start()
+		seg_length = len(args.groupList)/args.max_segs
+		remainder = len(args.groupList)%args.max_segs
+		for x in range(0, args.max_segs):
+			if(x == args.max_segs - 1 ):
+				w= Cluster_Partition_Thread(x, seg_length, remainder, args.graphType, args.period)
+				threads.append(w)
+				w.start()
+
+			else:
+				w= Cluster_Partition_Thread(x, seg_length, 0, args.graphType, args.period)
+				threads.append(w)
+				w.start()
+				
 
 	elif((args.group != 'None' and args.group != 'total') and args.n_graphing == 'true'):
 		#Print a large group total above the node breakdown if group graphing is enabled
 		if(args.g_graphing == 'true'):
 			subprocess.call([args.graph_script, str(args.group), str(args.graphType), str(args.period)])
-		for item in args.nodeList:
-			if(args.group in item):
-				thread_objects[item] = NodeThread(item, args.period)
-				thread_objects[item].start()
+		seg_length = len(args.nodeList)/args.max_segs
+		remainder = len(args.nodeList)%args.max_segs
+		for x in range(0, args.max_segs):
+			if(x == args.max_segs - 1):
+				w = NodeThread(x, seg_length, remainder, args.period)
+				threads.append(w)
+				w.start()
+			else:
+				w = NodeThread(x, seg_length, 0, args.period)
+				threads.append(w)
+				w.start()
 		
 	elif(args.group == 'None' and args.partition == 'partition' and args.p_graphing == 'true'):
-		for item in args.partList:
-			thread_objects[item] = Cluster_Partition_Thread(item, args.graphType, args.period)
-			thread_objects[item].start()
+		seg_length = len(args.partList)/args.max_segs
+		remainder = len(args.partList)%args.max_segs
+		for x in range(0, args.max_segs):
+			if(x == args.max_segs - 1 ):
+				w= Cluster_Partition_Thread(x, seg_length, remainder, args.graphType, args.period)
+				threads.append(w)
+				w.start()
+
+			else:
+				w= Cluster_Partition_Thread(x, seg_length, 0, args.graphType, args.period)
+				threads.append(w)
+				w.start()
 		
 	#Wait for threads to finish before moving on
-	for item in thread_objects:
-		thread_objects[item].join()
+	for x in range(0, args.max_segs):
+		w = threads[x]
+		w.join()
 

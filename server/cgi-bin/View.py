@@ -7,7 +7,7 @@ def display(args):
 <html>
 	<head>
 		<title>Slurm Usage Graphs</title>
-		<link href="/style.css" rel="stylesheet" type="text/css" />
+		<link href="/SlurmGraphingStyleSheet.css" rel="stylesheet" type="text/css" />
 		<script type='text/javascript'>setInterval( "autosubmit()", %s000 );function autosubmit(){ document.inputform.submit();}</script>
 
 		<!-- Prevent caching -->

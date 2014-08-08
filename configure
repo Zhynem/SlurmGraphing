@@ -20,6 +20,8 @@ cat >&2 << EOF
 		
 		--html-dir=/path/to/html : Path to store html related files in.
 		
+		-a : Enable all tracking options (totaling, partition, corejob, group, node).
+		
 		-pg || --partition-graphing : Enable graphing for configured partitions.
 		
 		-gg || --group-graphing : Enable graphing for configured groups of nodes.
@@ -93,6 +95,15 @@ case $i in
 	;;
 	--html-dir=*)
 		html_dir="${i#*=}"
+		shift
+	;;
+	-a)
+		partition_graphing="true"
+		group_graphing="true"
+		node_graphing="true"
+		corejob_graphing="true"
+		node_totaling="true"
+		part_totaling="true"
 		shift
 	;;
 	-pg|--partition-graphing)
@@ -205,9 +216,9 @@ if [[ -z "$slurm_bin" ]]; then
 		exit 1
 	fi
 	#If scontrol isn't in that location we can't operate
-	#if [[ ! -a "$temp/scontrol" ]]; then
-	#	printf "\nThe file 'scontrol' was not found in the directory specified.\nUse the format '/path/to/bin'\n"
-	#fi
+	if [ ! -a "$temp/scontrol" ] && [ "$quiet" == "false" ]; then
+		printf "\nThe file 'scontrol' was not found in the directory specified.\nUse the format '/path/to/bin'\n"
+	fi
 fi
 
 #If it wasn't set with a flag it will be set to the SlurmGraphing directory
@@ -294,6 +305,7 @@ fi
 #Determine partitions, groups, and nodes
 if [ -z "$partiionlist" ] && ([ "$partition_graphing" == "true" ] || [ "$part_totaling" == "true" ]); then
 	#scontrol show partition -o | sed 's/ /,/g' to get all partition info to get names
+	#Add check to only get non-hidden partitons?
 	p_info=($(cat parts.txt))
 	for item in ${p_info[@]}; do
 		name=$(echo $item | cut -f1 -d ',')
@@ -373,6 +385,24 @@ if [ -z "$nodelist" ] && ([ "$node_graphing" == "true" ] || [ "$node_totaling" =
 	fi
 fi
 
+if [[ "$quiet" == "false" ]]; then
+	echo -e "\nConfig files will now be written to:
+	
+	`pwd -P`/scripts/sgraphing.conf
+	$cgi_dir/config.py
+	
+It is recommended to double check these files to ensure all options are set correctly.\n"
+
+	echo -e "Thank you for using the SlurmGraphing software. For any help please contact me at Michael.Luker@usu.edu\n"
+fi
+
+#Copy files to cgi and html directories, setup ownership of graph.log and the graphs folder
+cp `pwd -P`/server/cgi-bin/* $cgi_dir/
+cp `pwd -P`/server/html/ $html_dir/
+mkdir $html_dir/graphs
+chmod 777 $html_dir/graphs
+chown apache:apache $html_dir/graphs
+
 #Write sgraphing.conf
 echo "## Paths ##
 ###########
@@ -405,7 +435,7 @@ time_step=$time_step
 ######################
 partitionlist=(${partitionlist[@]})
 grouplist=(${grouplist[@]})
-nodelist=(${nodelist[@]})" > sgraphing.conf #`pwd -P`/scripts/sgraphing.conf2
+nodelist=(${nodelist[@]})" > `pwd -P`/scripts/sgraphing.conf
 
 #Write config.py
 echo "## Items to Track ##
@@ -421,6 +451,7 @@ part_totaling='$part_totaling'
 #################
 main_links='$main_links'
 node_columns=$node_columns
+max_segs=$max_segs
 slider='$slider'
 manual='$manual'
 refresh=$refresh
@@ -437,4 +468,4 @@ nodelist=$(echo "[\"$(echo ${nodelist[@]} | sed 's/ /","/g')\"]")
 
 ## Debugging ##
 ###############
-debugging='false'" > config.py # > $cgi_dir/config.py
+debugging='false'" > $cgi_dir/config.py

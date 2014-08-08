@@ -24,6 +24,7 @@ class arguments():
 			self.g_graphing=cfg.group_graphing
 			self.n_graphing=cfg.node_graphing			
 			self.totaling=cfg.totaling
+			self.max_segs=cfg.max_segs
 			self.main_links=cfg.main_links
 			self.node_columns=cfg.node_columns
 			self.slider=cfg.slider
