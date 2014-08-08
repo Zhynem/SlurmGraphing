@@ -403,6 +403,12 @@ mkdir $html_dir/graphs
 chmod 777 $html_dir/graphs
 chown apache:apache $html_dir/graphs
 
+if [[ "$quiet" == "true" ]]; then
+	`pwd -P`/scripts/creation.sh > /dev/null
+else
+	`pwd -P`/scripts/creation.sh
+fi
+
 #Write sgraphing.conf
 echo "## Paths ##
 ###########
