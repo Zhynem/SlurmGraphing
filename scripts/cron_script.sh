@@ -27,7 +27,7 @@ function parseList(){
 	
 	#Call the function sent and send which segment this is, its length & remainder, and the list
 	for segment in $(seq "0" $((segs-1))); do
-		if [[ "$segment" -eq "7" ]]; then
+		if [[ "$segment" -eq "$segs" ]]; then
 			$func $segment $seg_length $remainder "${list[@]}" &
 		else
 			$func $segment $seg_length "0" "${list[@]}" &
