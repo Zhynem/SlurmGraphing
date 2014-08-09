@@ -44,7 +44,11 @@ cat >&2 << EOF
 		
 		--log-level=2 : Set the amount of logging to do (0,1, or 2).
 		
-		--config-file-path=/path/to/file : Use an existing file to set configured nodes and partitions.
+		--config-file-path=/path/to/file : Use an existing file to add/remove partitions, groups, or nodes.
+		
+		--update : Update SlurmGraphing to the latest release version.
+		
+		--uninstall : Clean up files used by SlurmGraphing.
 		
 		*Given these example inputs the RRD files will store 1051200 minutes (2 years) of data
 			because the time step is 60 seconds. An example of less frequent polling would be:
@@ -145,7 +149,7 @@ case $i in
 	;;
 	--log-level=*)
 		temp="${i#*=}"
-		if [[ "$temp" -lt "0" || "$temp" -gt "2" ]]; then
+		if [ "$temp" -lt "0" ] || [ "$temp" -gt "2" ]; then
 			echo "Error: Invalid logging level. Exiting." >&2
 			exit 1
 		else
@@ -153,18 +157,33 @@ case $i in
 		fi
 		shift		
 	;;
-	--config-file-path=*)
-		temp="${i#*=}"
-		file_loc=$(readlink -f $temp)
-		source $file_loc
-		shift
-	;;
 	-td=*|--time-duration=*)
 		time_duration="${i#*=}"
 		shift
 	;;
 	-ts=*|--time-step=*)
 		time_step="${i#*=}"
+		shift
+	;;
+	--config-file-path=*)
+		temp="${i#*=}"
+		file_loc=$(readlink -f $temp)
+		source $file_loc
+		unset partitionlist
+		unset grouplist
+		unset nodelist
+		shift
+	;;
+	--update)
+		try_update="true"
+		shift
+	;;
+	--uninstall)
+		#Read the .conf file
+		script_loc=$(readlink -f $0)
+		script_dir=$(dirname $script_loc)
+		source "$script_dir"/scripts/sgraphing.conf
+		uninstall="true"
 		shift
 	;;
 	#Display config
@@ -216,8 +235,9 @@ if [[ -z "$slurm_bin" ]]; then
 		exit 1
 	fi
 	#If scontrol isn't in that location we can't operate
-	if [ ! -a "$temp/scontrol" ] && [ "$quiet" == "false" ]; then
-		printf "\nThe file 'scontrol' was not found in the directory specified.\nUse the format '/path/to/bin'\n"
+	if [ ! -e $slurm_bin/scontrol ] && [ "$quiet" == "false" ]; then
+		printf "\nThe file 'scontrol' was not found in the directory $slurm_bin\nUse the format /path/to/bin\n"
+		exit 1
 	fi
 fi
 
@@ -300,6 +320,46 @@ fi
 
 if [[ -z "$refresh" ]]; then
 	refresh=60
+fi
+
+if [[ ! -z "$try_update" ]]; then
+	state=$(git fetch)
+	if [[ -z "$state" ]]; then
+		if [[ "$quiet" == "false" ]]; then
+			echo "Nothing to update"
+		fi
+		exit 0
+	else
+		if [[ "$quiet" == "false" ]]; then
+			git pull
+		else
+			git pull > /dev/null
+		fi
+	fi
+fi
+
+if [[ ! -z "$uninstall" ]]; then	
+	if [[ "$quiet" == "false" ]]; then
+		echo "Removing temp files"
+		rm -f /tmp/groupNodeSeg.* /tmp/indivPartSeg.* /tmp/parseNode.* /tmp/totalPartSeg.* /tmp/totalNodeSeg.*
+		echo "Removing cgi and html files"
+		rm -f $cgi_dir/Page.py $cgi_dir/Page.pyc $cgi_dir/Controller.py $cgi_dir/Controller.pyc $cgi_dir/View.py $cgi_dir/View.pyc $cgi_dir/config.py $cgi_dir/config.pyc
+		rm -f $html_dir/SlurmGraphingStyleSheet.css
+		rm -rf $html_dir/graphs
+		echo "Removing RRD and log files"
+		rm -rf $rrd_loc $log_loc
+		echo "Removing everything else"
+		cd .. && rm -rf SlurmGraphing
+		echo "Please make sure to remove the crontab entry for SlurmGraphing"
+	else
+		rm -f /tmp/groupNodeSeg.* /tmp/indivPartSeg.* /tmp/parseNode.* /tmp/totalPartSeg.* /tmp/totalNodeSeg.* > /dev/null
+		rm -f $cgi_dir/Page.py $cgi_dir/Page.pyc $cgi_dir/Controller.py $cgi_dir/Controller.pyc $cgi_dir/View.py $cgi_dir/View.pyc $cgi_dir/config.py $cgi_dir/config.pyc > /dev/null
+		rm -f $html_dir/SlurmGraphingStyleSheet.css > /dev/null
+		rm -rf $html_dir/graphs > /dev/null
+		rm -rf $rrd_loc $log_loc > /dev/null
+		cd .. && rm -rf SlurmGraphing > /dev/null
+	fi
+	exit 1
 fi
 
 #Determine partitions, groups, and nodes
@@ -458,15 +518,13 @@ nodelist=$(echo "[\"$(echo ${nodelist[@]} | sed 's/ /","/g')\"]")
 ###############
 debugging='false'" > $cgi_dir/config.py
 
-
-
-#Autogen stuff
+#Setup files and permissions
 #Copy files to cgi and html directories, setup ownership of graph.log and the graphs folder
 if [[ ! "$cgi_dir" == "`pwd -P`/server/cgi-bin" ]]; then
 	cp -u `pwd -P`/server/cgi-bin/* $cgi_dir/
 fi
 if [[ ! "$html_dir" == "`pwd -P`/server/html" ]]; then
-	cp -u `pwd -P`/server/html/ $html_dir/
+	cp -u `pwd -P`/server/html/* $html_dir/
 fi
 
 if [[ ! -d "$html_dir/graphs" ]]; then
@@ -475,6 +533,7 @@ if [[ ! -d "$html_dir/graphs" ]]; then
 	chown apache:apache $html_dir/graphs
 fi
 
+#Create directories for RRD's and logs if it doesn't already exist
 if [[ ! -d "$rrd_loc" ]]; then
 	mkdir $rrd_loc
 fi
@@ -482,9 +541,11 @@ if [[ ! -d "$log_loc" ]]; then
 	mkdir $log_loc
 fi
 
+#Create the graph log and set ownership to apache (graphing breaks otherwise)
 touch $log_loc/graph.log
 chown apache:apache $log_loc/graph.log
 
+#Create all the RRD files
 if [[ "$quiet" == "true" ]]; then
 	`pwd -P`/scripts/creation.sh > /dev/null
 else
@@ -492,13 +553,13 @@ else
 	`pwd -P`/scripts/creation.sh
 fi
 
-wait
-
-echo "* * * * * `pwd -P`/scripts/cron_script.sh >> $log_loc/master.log" > tmp
+#Store current crontab data in file, add entry for SlurmGraphing, restore crontab
+crontab -l > tmp
+echo "* * * * * `pwd -P`/scripts/cron_script.sh >> $log_loc/master.log" >> tmp
 crontab tmp
 rm tmp
 
-
+#Thanks!
 if [[ "$quiet" == "false" ]]; then
 	echo -e "Thank you for using the SlurmGraphing software. For any help please contact me at Michael.Luker@usu.edu\n"
 fi

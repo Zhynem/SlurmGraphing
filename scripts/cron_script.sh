@@ -96,7 +96,7 @@ function get_node_info() {
 	
 	#Combine results and return them
 	for x in $(seq 0 $((segs-1))); do
-		if [[ -a "/tmp/parseNode.$x" ]]; then
+		if [[ -e "/tmp/parseNode.$x" ]]; then
 			temp=($(cat /tmp/parseNode.$x))
 			combined=("${combined[@]}" "${temp[@]}")
 		fi
@@ -170,7 +170,7 @@ function node_total() {
 	
 	#Construct results
 	for x in $(seq 0 $((segs-1))); do
-		if [[ -a "/tmp/totalNodeSeg.$x" ]]; then
+		if [[ -e "/tmp/totalNodeSeg.$x" ]]; then
 			temp=($(cat /tmp/totalNodeSeg.$x | sed 's/-/ /g'))
 			t_b="${temp[0]}"
 			t_i="${temp[1]}"
