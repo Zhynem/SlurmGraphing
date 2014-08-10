@@ -175,6 +175,9 @@ case $i in
 		shift
 	;;
 	--update)
+		script_loc=$(readlink -f $0)
+		script_dir=$(dirname $script_loc)
+		source "$script_dir"/scripts/sgraphing.conf
 		try_update="true"
 		shift
 	;;
@@ -553,13 +556,9 @@ else
 	`pwd -P`/scripts/creation.sh
 fi
 
-#Store current crontab data in file, add entry for SlurmGraphing, restore crontab
-crontab -l > tmp
-echo "* * * * * `pwd -P`/scripts/cron_script.sh >> $log_loc/master.log" >> tmp
-crontab tmp
-rm tmp
-
 #Thanks!
 if [[ "$quiet" == "false" ]]; then
+	echo -e "Please make an entry to your crontab to match up with the desired time step (default 60 second)
+  A default entry would look like : * * * * * $(pwd -P)/scripts/cron_script.sh >> $log_loc/master.log"
 	echo -e "Thank you for using the SlurmGraphing software. For any help please contact me at Michael.Luker@usu.edu\n"
 fi

@@ -29,4 +29,4 @@ Things to note
 
 -Depending on time step and duration options set RRD files may take up a lot of space, as well as take a long time to create. Running configure without the -q flag will output which RRD files are currently being created. (An RRD file is created at full size and will not take up any more space once data starts being stored)
 
--If you change your mind about an option later you can directly modify options from the sgraphing.conf and config.py files. The configure script will setup ownership on these files so that only the user who installed the software can make changes.
+-If you change your mind about an option later you can directly modify options from the sgraphing.conf and config.py files.
