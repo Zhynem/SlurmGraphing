@@ -14,9 +14,9 @@ Installing
 
 3: cd SlurmGraphing
 
-4: ./configure \[flags\] (Run ./configure -h or ./configure --help to see detailed list of options)
+4: ./configure \[flags\] (Run ./configure -h or ./configure --help to or check the github wiki to see detailed list of options)
 
-5: Depending on what flags were chosen there may be additional steps to take. If -q was not a flag used instructions will be printed to the screen. More detailed information is on the github wiki.
+5: Create an entry in your crontab to run cron_script.sh every time step
     
 Things to note
 ==============

@@ -34,7 +34,7 @@ cat >&2 << EOF
 		
 		-pt || --part-totaling : Enable summation of jobs.
 		
-		-td=1051200 || --time-duration=1051200 : Rows* in an RRD file.
+		-td=525600 || --time-duration=525600 : Rows* in an RRD file.
 		
 		-ts=60 || --time-step=60 : Time between RRD updates (in seconds).
 		
@@ -46,13 +46,7 @@ cat >&2 << EOF
 		
 		--config-file-path=/path/to/file : Use an existing file to add/remove partitions, groups, or nodes.
 		
-		--update : Update SlurmGraphing to the latest release version.
-		
 		--uninstall : Clean up files used by SlurmGraphing.
-		
-		*Given these example inputs the RRD files will store 1051200 minutes (2 years) of data
-			because the time step is 60 seconds. An example of less frequent polling would be:
-			-td=525600 and -ts=120 (Update every 2 minutes for 2 years)
 
 	Display arguments:
 	
@@ -323,22 +317,6 @@ fi
 
 if [[ -z "$refresh" ]]; then
 	refresh=60
-fi
-
-if [[ ! -z "$try_update" ]]; then
-	state=$(git fetch)
-	if [[ -z "$state" ]]; then
-		if [[ "$quiet" == "false" ]]; then
-			echo "Nothing to update"
-		fi
-		exit 0
-	else
-		if [[ "$quiet" == "false" ]]; then
-			git pull
-		else
-			git pull > /dev/null
-		fi
-	fi
 fi
 
 if [[ ! -z "$uninstall" ]]; then	
