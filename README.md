@@ -3,7 +3,22 @@ SlurmGraphing
 
 Visualize the utilization of an HPC environment configured with Slurm from a convenient web interface.
 
-A release version is not yet ready. Work is still being done in the Developing branch.
+Version 1.0 (Speculative Sanderling)
+
+Requirements
+============
+
+At this point in time I'm not sure about absolute requirements but I will describe the setup this software was made for.
+
+-The machine: Virtual machine with 4 2.6 GHz processors with access to slurm configured for our cluster. Also configured for web access. This is a dedicated host to graphing our resource use, and root was the only account used during setup.
+
+-Bash version 4.1.2
+
+-Python version 2.6.6
+
+-RRDtool version 1.3.8
+
+-Apache 2.2.15 (I assume another program would work as long cgi can be configured.)
 
 Installing
 ==========
@@ -14,7 +29,7 @@ Installing
 
 3: cd SlurmGraphing
 
-4: ./configure \[flags\] (Run ./configure -h or ./configure --help to or check the github wiki to see detailed list of options)
+4: ./configure \[flags\] (Run ./configure -h or ./configure --help or check the github wiki to see detailed list of options)
 
 5: Create an entry in your crontab to run cron_script.sh every time step
     
@@ -23,7 +38,7 @@ Things to note
 
 -Partitions that contain every node are not needed for any data collection. If all jobs run in a partition like this it is recommended partition totaling is turned off to avoid unnecessary parsing and graphing.
 
--If configure is run as root it will detect hidden partitions. If there are hidden partitions you do not wish to track run the configure script without the -q (quiet) flag on, or as another user.
+-The configure script will detect hidden partitions. If there are hidden partitions you do not wish to track run the configure script without the -q (quiet) flag on.
 
 -Log files are not automatically cleaned in any way. If the logging level is set to 1 or 2 they will get large over time.
 
