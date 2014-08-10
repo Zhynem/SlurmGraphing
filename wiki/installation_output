@@ -1,0 +1,211 @@
+[root@hyperion hyperion]# ls
+hyperionStartup
+[root@hyperion hyperion]# git clone https://github.com/michaelluker/SlurmGraphing.git
+Initialized empty Git repository in /rc/hyperion/SlurmGraphing/.git/
+remote: Counting objects: 157, done.
+remote: Compressing objects: 100% (124/124), done.
+remote: Total 157 (delta 73), reused 66 (delta 27)
+Receiving objects: 100% (157/157), 44.88 KiB, done.
+Resolving deltas: 100% (73/73), done.
+[root@hyperion hyperion]# ls
+hyperionStartup  SlurmGraphing
+[root@hyperion hyperion]# cd SlurmGraphing/
+[root@hyperion SlurmGraphing]# ls
+configure  README.md  scripts  server
+[root@hyperion SlurmGraphing]# ./configure -a --slurm-bin=/rc/slurm/current/bin --max-segs=8 --log-level=2 -ml
+
+Partitions found: short batch long interactive ALL gpu phi
+Are these correct? (y/n): n
+Enter the name of the partition to remove: ALL
+
+Partitions found: short batch long interactive gpu phi
+Are these correct? (y/n): y
+
+Groups found: gonium gpu interactive lycaeides navier pandorina sawtooth volvox wasatch
+Are these correct? (y/n): y
+
+A list of all nodes has been generated based on scontrol output.
+When this is finished please double check that it contains all nodes you wish to track.
+
+
+Config files will now be written to:
+	
+	/rc/hyperion/SlurmGraphing/scripts/sgraphing.conf
+	/rc/hyperion/SlurmGraphing/server/cgi-bin/config.py
+	
+It is recommended to double check these files to ensure all options are set correctly.
+
+Creating RRD files, this may take a long time.
+Creating short part RRD file
+Creating short corejob RRD file
+Creating batch part RRD file
+Creating batch corejob RRD file
+Creating long part RRD file
+Creating long corejob RRD file
+Creating interactive part RRD file
+Creating interactive corejob RRD file
+Creating gpu part RRD file
+Creating gpu corejob RRD file
+Creating phi part RRD file
+Creating phi corejob RRD file
+Creating gonium group RRD file
+Creating gpu group RRD file
+Creating interactive group RRD file
+Creating lycaeides group RRD file
+Creating navier group RRD file
+Creating pandorina group RRD file
+Creating sawtooth group RRD file
+Creating volvox group RRD file
+Creating wasatch group RRD file
+Creating gonium-0931 node RRD file
+Creating gonium-0932 node RRD file
+Creating gonium-0933 node RRD file
+Creating gonium-0934 node RRD file
+Creating gpu-00 node RRD file
+Creating gpu-01 node RRD file
+Creating interactive-k0913 node RRD file
+Creating interactive-k0914 node RRD file
+Creating interactive-k0915 node RRD file
+Creating interactive-k0916 node RRD file
+Creating lycaeides-k0623 node RRD file
+Creating lycaeides-k0625 node RRD file
+Creating navier-0607 node RRD file
+Creating navier-0608 node RRD file
+Creating navier-0609 node RRD file
+Creating navier-0610 node RRD file
+Creating navier-0611 node RRD file
+Creating navier-0612 node RRD file
+Creating navier-0613 node RRD file
+Creating navier-0614 node RRD file
+Creating navier-0615 node RRD file
+Creating navier-0616 node RRD file
+Creating navier-0617 node RRD file
+Creating navier-0618 node RRD file
+Creating navier-0620 node RRD file
+Creating navier-0621 node RRD file
+Creating navier-0622 node RRD file
+Creating navier-0623 node RRD file
+Creating navier-0624 node RRD file
+Creating navier-0625 node RRD file
+Creating navier-0626 node RRD file
+Creating navier-0627 node RRD file
+Creating navier-0628 node RRD file
+Creating navier-0629 node RRD file
+Creating pandorina-k092100 node RRD file
+Creating pandorina-k092101 node RRD file
+Creating pandorina-k092200 node RRD file
+Creating pandorina-k092201 node RRD file
+Creating pandorina-k092300 node RRD file
+Creating pandorina-k092301 node RRD file
+Creating pandorina-k092400 node RRD file
+Creating pandorina-k092401 node RRD file
+Creating sawtooth-00 node RRD file
+Creating sawtooth-01 node RRD file
+Creating sawtooth-02 node RRD file
+Creating sawtooth-03 node RRD file
+Creating sawtooth-04 node RRD file
+Creating sawtooth-05 node RRD file
+Creating sawtooth-06 node RRD file
+Creating sawtooth-07 node RRD file
+Creating sawtooth-08 node RRD file
+Creating sawtooth-09 node RRD file
+Creating sawtooth-10 node RRD file
+Creating sawtooth-11 node RRD file
+Creating sawtooth-12 node RRD file
+Creating sawtooth-13 node RRD file
+Creating sawtooth-14 node RRD file
+Creating sawtooth-15 node RRD file
+Creating sawtooth-16 node RRD file
+Creating sawtooth-17 node RRD file
+Creating sawtooth-18 node RRD file
+Creating sawtooth-19 node RRD file
+Creating sawtooth-20 node RRD file
+Creating sawtooth-21 node RRD file
+Creating sawtooth-22 node RRD file
+Creating sawtooth-23 node RRD file
+Creating sawtooth-24 node RRD file
+Creating sawtooth-25 node RRD file
+Creating sawtooth-26 node RRD file
+Creating sawtooth-27 node RRD file
+Creating sawtooth-28 node RRD file
+Creating sawtooth-29 node RRD file
+Creating sawtooth-30 node RRD file
+Creating sawtooth-31 node RRD file
+Creating volvox node RRD file
+Creating wasatch-00 node RRD file
+Creating wasatch-01 node RRD file
+Creating wasatch-02 node RRD file
+Creating wasatch-03 node RRD file
+Creating wasatch-04 node RRD file
+Creating wasatch-05 node RRD file
+Creating wasatch-06 node RRD file
+Creating wasatch-07 node RRD file
+Creating wasatch-08 node RRD file
+Creating wasatch-09 node RRD file
+Creating wasatch-10 node RRD file
+Creating wasatch-11 node RRD file
+Creating wasatch-12 node RRD file
+Creating wasatch-13 node RRD file
+Creating wasatch-14 node RRD file
+Creating wasatch-15 node RRD file
+Creating wasatch-16 node RRD file
+Creating wasatch-17 node RRD file
+Creating wasatch-18 node RRD file
+Creating wasatch-19 node RRD file
+Creating wasatch-20 node RRD file
+Creating wasatch-21 node RRD file
+Creating wasatch-22 node RRD file
+Creating wasatch-23 node RRD file
+Creating wasatch-24 node RRD file
+Creating wasatch-25 node RRD file
+Creating wasatch-26 node RRD file
+Creating wasatch-27 node RRD file
+Creating wasatch-28 node RRD file
+Creating wasatch-29 node RRD file
+Creating wasatch-30 node RRD file
+Creating wasatch-31 node RRD file
+Creating wasatch-32 node RRD file
+Creating wasatch-33 node RRD file
+Creating wasatch-34 node RRD file
+Creating wasatch-35 node RRD file
+Creating wasatch-36 node RRD file
+Creating wasatch-37 node RRD file
+Creating wasatch-38 node RRD file
+Creating wasatch-39 node RRD file
+Creating wasatch-40 node RRD file
+Creating wasatch-41 node RRD file
+Creating wasatch-42 node RRD file
+Creating wasatch-43 node RRD file
+Creating wasatch-44 node RRD file
+Creating wasatch-45 node RRD file
+Creating wasatch-46 node RRD file
+Creating wasatch-47 node RRD file
+Creating wasatch-48 node RRD file
+Creating wasatch-49 node RRD file
+Creating wasatch-50 node RRD file
+Creating wasatch-51 node RRD file
+Creating wasatch-52 node RRD file
+Creating wasatch-53 node RRD file
+Creating wasatch-54 node RRD file
+Creating wasatch-55 node RRD file
+Creating wasatch-56 node RRD file
+Creating wasatch-57 node RRD file
+Creating wasatch-58 node RRD file
+Creating wasatch-59 node RRD file
+Creating wasatch-60 node RRD file
+Creating wasatch-61 node RRD file
+Creating node totaling RRD Files
+Creating partition totaling RRD Files
+Creating phi corejob RRD file
+All RRD files have been created
+Please make an entry to your crontab to match up with the desired time step (default 60 second)
+  A default entry would look like : * * * * * /rc/hyperion/SlurmGraphing/scripts/cron_script.sh >> /rc/hyperion/SlurmGraphing/logs/master.log
+Thank you for using the SlurmGraphing software. For any help please contact me at Michael.Luker@usu.edu
+
+[root@hyperion SlurmGraphing]# echo "* * * * * /rc/hyperion/SlurmGraphing/scripts/cron_script.sh >> /rc/hyperion/SlurmGraphing/logs/master.log" > temp && crontab temp && rm temp
+rm: remove regular file `temp'? y
+[root@hyperion SlurmGraphing]# crontab -l
+* * * * * /rc/hyperion/SlurmGraphing/scripts/cron_script.sh >> /rc/hyperion/SlurmGraphing/logs/master.log
+[root@hyperion SlurmGraphing]# service httpd start
+Starting httpd:                                            [  OK  ]
+[root@hyperion SlurmGraphing]#
