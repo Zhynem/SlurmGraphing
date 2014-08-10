@@ -1,4 +1,10 @@
 #!/usr/bin/python
+
+# Author: Michael Luker
+# Project: SlurmGraphing
+# Version: 1.0 (Speculative Sanderling)
+# Date: August 10, 2014
+
 #Page: Call the controller actions, then display the view
 import Controller
 import View

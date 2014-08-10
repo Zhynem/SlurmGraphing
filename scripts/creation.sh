@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Author: Michael Luker
+# Project: SlurmGraphing
+# Version: 1.0 (Speculative Sanderling)
+# Date: August 10, 2014
+
 #Read the .conf file
 script_loc=$(readlink -f $0)
 script_dir=$(dirname $script_loc)

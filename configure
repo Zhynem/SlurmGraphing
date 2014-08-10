@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Author: Michael Luker
+# Project: SlurmGraphing
+# Version: 1.0 (Speculative Sanderling)
+# Date: August 10, 2014
+
 # Script to generate the sgraphing.conf and the config.py files
 
 function print_help()

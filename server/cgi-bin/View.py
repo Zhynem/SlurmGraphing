@@ -1,3 +1,8 @@
+# Author: Michael Luker
+# Project: SlurmGraphing
+# Version: 1.0 (Speculative Sanderling)
+# Date: August 10, 2014
+
 #View: Recieve variables that were modified by the controller or loaded by the config and display the page accordingly
 
 def display(args):

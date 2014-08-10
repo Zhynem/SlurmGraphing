@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Author: Michael Luker
+# Project: SlurmGraphing
+# Version: 1.0 (Speculative Sanderling)
+# Date: August 10, 2014
+
 #Get the current date
 END=$(($(date +%s)))
 

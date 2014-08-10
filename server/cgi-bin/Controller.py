@@ -1,3 +1,8 @@
+# Author: Michael Luker
+# Project: SlurmGraphing
+# Version: 1.0 (Speculative Sanderling)
+# Date: August 10, 2014
+
 #Controller: Functions that control the states of the argument variables
 
 #Import needed items

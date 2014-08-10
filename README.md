@@ -1,3 +1,8 @@
+<!-- # Author: Michael Luker -->
+<!-- # Project: SlurmGraphing -->
+<!-- # Version: 1.0 (Speculative Sanderling) -->
+<!-- # Date: August 10, 2014 -->
+
 SlurmGraphing
 =============
 
@@ -5,8 +10,7 @@ Visualize the utilization of an HPC environment configured with Slurm from a con
 
 Version 1.0 (Speculative Sanderling)
 
-Requirements
-============
+**Requirements**
 
 At this point in time I'm not sure about absolute requirements but I will describe the setup this software was made for.
 
@@ -20,8 +24,7 @@ At this point in time I'm not sure about absolute requirements but I will descri
 
 -Apache 2.2.15 (I assume another program would work as long cgi can be configured.)
 
-Installing
-==========
+**Installing**
 
 1: Change to the directory you wish to keep the software in
 
@@ -33,8 +36,7 @@ Installing
 
 5: Create an entry in your crontab to run cron_script.sh every time step
     
-Things to note
-==============
+**Things to note**
 
 -Partitions that contain every node are not needed for any data collection. If all jobs run in a partition like this it is recommended partition totaling is turned off to avoid unnecessary parsing and graphing.
 
