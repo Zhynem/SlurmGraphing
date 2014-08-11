@@ -10,6 +10,8 @@ Visualize the utilization of an HPC environment configured with Slurm from a con
 
 Version 1.0 (Speculative Sanderling)
 
+Please read the [wiki](https://github.com/MichaelLuker/SlurmGraphing/wiki) for details about configuring.
+
 **Requirements**
 
 At this point in time I'm not sure about absolute requirements but I will describe the setup this software was made for.
@@ -32,7 +34,7 @@ At this point in time I'm not sure about absolute requirements but I will descri
 
 3: cd SlurmGraphing
 
-4: ./configure \[flags\] (Run ./configure -h or ./configure --help or check the github wiki to see detailed list of options)
+4: ./configure \[flags\] (Run ./configure -h or ./configure --help or check the wiki to see detailed list of options)
 
 5: Create an entry in your crontab to run cron_script.sh every time step
     
