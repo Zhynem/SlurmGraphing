@@ -241,6 +241,14 @@ if [[ -z "$slurm_bin" ]]; then
 		printf "\nThe file 'scontrol' was not found in the directory $slurm_bin\nUse the format /path/to/bin\n"
 		exit 1
 	fi
+else
+	#If scontrol isn't in that location we can't operate
+	if [ ! -e $slurm_bin/scontrol ] && [ "$quiet" == "false" ]; then
+		printf "\nThe file 'scontrol' was not found in the directory $slurm_bin\nUse the format /path/to/bin\n"
+		exit 1
+	elif [ ! -e $slurm_bin/scontrol ] && [ "$quiet" == "true" ]; then
+		exit 1
+	fi
 fi
 
 #If it wasn't set with a flag it will be set to the SlurmGraphing directory
@@ -504,6 +512,10 @@ nodelist=$(echo "[\"$(echo ${nodelist[@]} | sed 's/ /","/g')\"]")
 ###############
 debugging='false'" > $cgi_dir/config.py
 
+#Write locations to make_graph.sh
+sed -i "s/CONFFILE/$(pwd -P | sed 's/\//\\\//g')\/scripts\/sgraphing.conf/g" $graph_script
+sed -i "s/GRAPHDIR/$(echo $html_dir | sed 's/\//\\\//g')\/graphs/g" $graph_script
+
 #Setup files and permissions
 #Copy files to cgi and html directories, setup ownership of graph.log and the graphs folder
 if [[ ! "$cgi_dir" == "`pwd -P`/server/cgi-bin" ]]; then
@@ -513,10 +525,29 @@ if [[ ! "$html_dir" == "`pwd -P`/server/html" ]]; then
 	cp -u `pwd -P`/server/html/* $html_dir/
 fi
 
+#Check to see if there's an apached, nginx, or www-data user
+if [[ "$(grep 'apache' /etc/passwd > /dev/null; echo $?)" == "0" ]]; then
+    user="apache"
+	group="apache"
+elif [[ "$(grep 'nginx' /etc/passwd > /dev/null; echo $?)" == "0" ]]; then
+    user="nginx"
+	group="nginx"
+elif [[ "$(grep 'www-data' /etc/passwd > /dev/null; echo $?)" == "0" ]]; then
+    user="www-data"
+	group="www-data"
+else
+	user=$(whoami)
+	group=$(whoami)
+fi
+
+if [[ "$quiet" == "false" ]]; then
+	echo "Setting ownership of $html_dir/graphs and $log_loc/graph.log to $user:$group"
+fi
+
 if [[ ! -d "$html_dir/graphs" ]]; then
 	mkdir $html_dir/graphs
-	chmod 777 $html_dir/graphs
-	chown apache:apache $html_dir/graphs
+	chmod 755 $html_dir/graphs
+	chown $user:$group $html_dir/graphs
 fi
 
 #Create directories for RRD's and logs if it doesn't already exist
@@ -529,7 +560,7 @@ fi
 
 #Create the graph log and set ownership to apache (graphing breaks otherwise)
 touch $log_loc/graph.log
-chown apache:apache $log_loc/graph.log
+chown $user:$group $log_loc/graph.log
 
 #Create all the RRD files
 if [[ "$quiet" == "true" ]]; then

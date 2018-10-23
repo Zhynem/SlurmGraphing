@@ -78,10 +78,17 @@ function parseNode() {
 	for index in `seq $start $end`; do
 		item=$(echo ${list[$index]})
 		item=($(echo ${item//,/ }))
-		name=$(echo ${item[0]} | cut -f2 -d '=')
-		alloc=$(echo ${item[3]} | cut -f2 -d '=')
-		tot=$(echo ${item[5]} | cut -f2 -d '=')
-		state=$(echo ${item[17]} | cut -f2 -d '=' | sed 's/[0-9!@#$%^&*)(_+=-].*//g')
+		for d in ${item[@]}; do 
+			if [[ $d == *"NodeName"* ]]; then 
+				name=$(echo $d | cut -f2 -d '=')
+			elif [[ $d == *"CPUAlloc"* ]]; then 
+				alloc=$(echo $d | cut -f2 -d '=')
+			elif [[ $d == *"CPUTot"* ]]; then 
+				tot=$(echo $d | cut -f2 -d '=')
+			elif [[ $d == *"State"* ]]; then 
+				state=$(echo $d | cut -f2 -d '=' | sed 's/[0-9!@#$%^&*)(_+=-].*//g')
+			fi
+		done
 		configuredNode "$name"
 		if [[ $? == 1 ]]; then
 			echo "$name,$alloc,$tot,$state" >> /tmp/parseNode.$segment
